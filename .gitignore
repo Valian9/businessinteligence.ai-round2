@@ -1,0 +1,20 @@
+# Java / Spring Boot
+backend/target/
+backend/.idea/
+backend/*.iml
+
+# Environment / secrets
+backend/src/main/resources/application-local.properties
+.env
+*.env
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

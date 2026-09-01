@@ -1,0 +1,16 @@
+date,campaign,category,spend,impressions,clicks,conversions
+2026-08-01,TechFest,Electronics,12000,50000,3200,480
+2026-08-02,TechFest,Electronics,11800,49000,3150,470
+2026-08-03,TechFest,Electronics,12500,52000,3300,500
+2026-08-04,StyleSale,Clothing,9000,42000,2800,430
+2026-08-05,StyleSale,Clothing,9200,43000,2850,440
+2026-08-06,HomeFest,Home,8000,38000,2400,390
+2026-08-07,HomeFest,Home,8200,39000,2450,400
+2026-08-08,TechFest,Electronics,7500,35000,2100,300
+2026-08-09,TechFest,Electronics,7200,34000,2050,290
+2026-08-10,TechFest,Electronics,7000,33000,1980,275
+2026-08-11,TechFest,Electronics,6800,32000,1900,260
+2026-08-12,StyleSale,Clothing,8500,40000,2700,410
+2026-08-13,HomeFest,Home,7800,37000,2350,380
+2026-08-14,TechFest,Electronics,6500,31000,1820,245
+2026-08-15,TechFest,Electronics,6300,30000,1750,230
