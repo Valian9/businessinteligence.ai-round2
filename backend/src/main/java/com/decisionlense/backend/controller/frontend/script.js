@@ -1,4 +1,42 @@
+
 const API = "http://localhost:8080/api";
+
+
+// =====================================================
+// AUTHENTICATION STATE
+// =====================================================
+
+let authState = {
+    authenticated: false,
+    username: null,
+    password: null,
+    role: null,
+    persona: null
+};
+
+
+// =====================================================
+// DEMO USERS
+// =====================================================
+
+const DEMO_USERS = {
+
+    supply: {
+        role: "SUPPLY_CHAIN_MANAGER",
+        persona: "Supply Chain Manager"
+    },
+
+    marketing: {
+        role: "MARKETING_MANAGER",
+        persona: "Marketing Manager"
+    },
+
+    executive: {
+        role: "EXECUTIVE",
+        persona: "Executive"
+    }
+
+};
 
 
 // =====================================================
@@ -7,33 +45,684 @@ const API = "http://localhost:8080/api";
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    const analyzeBtn = document.getElementById("analyzeBtn");
-    const fileInput = document.getElementById("csvFile");
+    const analyzeBtn =
+        document.getElementById("analyzeBtn");
+
+    const fileInput =
+        document.getElementById("csvFile");
+
 
     if (analyzeBtn) {
-        analyzeBtn.addEventListener("click", analyzeCSV);
+
+        analyzeBtn.addEventListener(
+            "click",
+            analyzeCSV
+        );
+
     }
 
-    // Show selected filename
+
     if (fileInput) {
+
         fileInput.addEventListener("change", () => {
 
             const status =
                 document.getElementById("uploadStatus");
 
+
             if (
                 fileInput.files &&
-                fileInput.files.length > 0
+                fileInput.files.length > 0 &&
+                status
             ) {
+
                 status.textContent =
                     "📁 Selected: " +
                     fileInput.files[0].name;
+
             }
 
         });
+
     }
 
+
+    // =================================================
+    // PERSONA CHANGE
+    // =================================================
+
+    const personaSelect =
+        document.getElementById("personaSelect");
+
+
+    if (personaSelect) {
+
+        personaSelect.addEventListener("change", () => {
+
+            console.log(
+                "Authorized persona:",
+                personaSelect.value
+            );
+
+        });
+
+    }
+
+
+    // =================================================
+    // INITIAL UI STATE
+    // =================================================
+
+    resetAuthenticatedUI();
+
 });
+
+
+// =====================================================
+// LOGIN
+// =====================================================
+
+function loginUser() {
+
+    const usernameInput =
+        document.getElementById("username");
+
+    const passwordInput =
+        document.getElementById("password");
+
+
+    const username =
+        usernameInput?.value
+            ?.trim()
+            .toLowerCase();
+
+
+    const password =
+        passwordInput?.value || "";
+
+
+    if (!username || !password) {
+
+        showLoginMessage(
+            "Please enter username and password.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    const user =
+        DEMO_USERS[username];
+
+
+    if (!user) {
+
+        showLoginMessage(
+            "Invalid username.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Frontend does NOT decide whether the password
+     * is correct.
+     *
+     * The actual authentication authority is
+     * Spring Security on the backend.
+     *
+     * We temporarily store the credentials so that
+     * Basic Authentication can be sent with API calls.
+     */
+
+
+    authState = {
+
+        authenticated: true,
+
+        username: username,
+
+        password: password,
+
+        role: user.role,
+
+        persona: user.persona
+
+    };
+
+
+    updateAuthenticatedUI();
+
+
+    showLoginMessage(
+        "Credentials loaded. Verifying with backend...",
+        "success"
+    );
+
+
+    /*
+     * Verify credentials immediately.
+     *
+     * This prevents the UI from saying "logged in"
+     * when the backend password is actually wrong.
+     */
+
+    verifyBackendAuthentication();
+
+}
+
+
+// =====================================================
+// VERIFY BACKEND AUTHENTICATION
+// =====================================================
+
+async function verifyBackendAuthentication() {
+
+    try {
+
+        const response =
+            await authenticatedFetch(
+                `${API}/health`,
+                {
+                    method: "GET"
+                }
+            );
+
+
+        /*
+         * If health endpoint is public, this alone
+         * cannot verify credentials.
+         *
+         * Therefore we do not treat this request as
+         * the final authorization decision.
+         */
+
+
+        if (response.status === 401) {
+
+            handleUnauthorized();
+
+            showLoginMessage(
+                "❌ Invalid username or password.",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        /*
+         * Authentication will be definitively checked
+         * when the protected analysis endpoint is called.
+         */
+
+        showLoginMessage(
+            "✅ Ready. Backend authorization will be enforced during analysis.",
+            "success"
+        );
+
+    }
+
+
+    catch (error) {
+
+        console.error(
+            "Authentication verification error:",
+            error
+        );
+
+        /*
+         * Do not immediately logout on network errors.
+         * The backend may simply not be running.
+         */
+
+        showLoginMessage(
+            "⚠️ Backend connection could not be verified. Start Spring Boot before analysis.",
+            "error"
+        );
+
+    }
+
+}
+
+
+// =====================================================
+// UPDATE AUTHENTICATED UI
+// =====================================================
+
+function updateAuthenticatedUI() {
+
+    const authSection =
+        document.getElementById("authSection");
+
+    const userSession =
+        document.getElementById("userSession");
+
+    const loggedInUser =
+        document.getElementById("loggedInUser");
+
+    const loggedInRole =
+        document.getElementById("loggedInRole");
+
+    const personaSelect =
+        document.getElementById("personaSelect");
+
+
+    if (authSection) {
+
+        authSection.style.display =
+            "none";
+
+    }
+
+
+    if (userSession) {
+
+        userSession.style.display =
+            "flex";
+
+    }
+
+
+    if (loggedInUser) {
+
+        loggedInUser.textContent =
+            "👤 " + authState.username;
+
+    }
+
+
+    if (loggedInRole) {
+
+        loggedInRole.textContent =
+            authState.persona;
+
+    }
+
+
+    if (personaSelect) {
+
+        personaSelect.innerHTML = "";
+
+
+        const option =
+            document.createElement("option");
+
+
+        option.value =
+            authState.persona;
+
+
+        option.textContent =
+            authState.persona;
+
+
+        option.selected =
+            true;
+
+
+        personaSelect.appendChild(
+            option
+        );
+
+
+        /*
+         * Persona is locked.
+         *
+         * User cannot select another persona.
+         *
+         * Backend also independently validates
+         * role/persona authorization.
+         */
+
+        personaSelect.disabled =
+            true;
+
+    }
+
+
+    const multiSourceBtn =
+        document.getElementById(
+            "multiSourceBtn"
+        );
+
+
+    if (multiSourceBtn) {
+
+        multiSourceBtn.disabled =
+            false;
+
+    }
+
+
+    const status =
+        document.getElementById(
+            "multiSourceStatus"
+        );
+
+
+    if (status) {
+
+        status.textContent =
+            "Select all 3 files to begin.";
+
+    }
+
+}
+
+
+// =====================================================
+// RESET AUTH UI
+// =====================================================
+
+function resetAuthenticatedUI() {
+
+    const authSection =
+        document.getElementById("authSection");
+
+    const userSession =
+        document.getElementById("userSession");
+
+    const personaSelect =
+        document.getElementById("personaSelect");
+
+
+    if (authSection) {
+
+        authSection.style.display =
+            "block";
+
+    }
+
+
+    if (userSession) {
+
+        userSession.style.display =
+            "none";
+
+    }
+
+
+    if (personaSelect) {
+
+        personaSelect.innerHTML =
+            `<option value="">🔐 Login required</option>`;
+
+        personaSelect.disabled =
+            true;
+
+    }
+
+
+    const multiSourceBtn =
+        document.getElementById(
+            "multiSourceBtn"
+        );
+
+
+    if (multiSourceBtn) {
+
+        multiSourceBtn.disabled =
+            false;
+
+    }
+
+}
+
+
+// =====================================================
+// LOGOUT
+// =====================================================
+
+function logoutUser() {
+
+    authState = {
+
+        authenticated: false,
+
+        username: null,
+
+        password: null,
+
+        role: null,
+
+        persona: null
+
+    };
+
+
+    resetAuthenticatedUI();
+
+
+    const usernameInput =
+        document.getElementById("username");
+
+    const passwordInput =
+        document.getElementById("password");
+
+
+    if (usernameInput) {
+
+        usernameInput.value = "";
+
+    }
+
+
+    if (passwordInput) {
+
+        passwordInput.value = "";
+
+    }
+
+
+    const loginMessage =
+        document.getElementById(
+            "loginMessage"
+        );
+
+
+    if (loginMessage) {
+
+        loginMessage.textContent =
+            "Logged out successfully.";
+
+        loginMessage.className =
+            "login-message success";
+
+    }
+
+
+    const status =
+        document.getElementById(
+            "multiSourceStatus"
+        );
+
+
+    if (status) {
+
+        status.textContent =
+            "🔐 Login required.";
+
+    }
+
+
+    const insights =
+        document.getElementById(
+            "insights"
+        );
+
+
+    if (insights) {
+
+        insights.innerHTML = `
+
+            <div class="insight">
+
+                🔐 Please login to generate
+                business intelligence.
+
+            </div>
+
+        `;
+
+    }
+
+}
+
+
+// =====================================================
+// LOGIN MESSAGE
+// =====================================================
+
+function showLoginMessage(
+    message,
+    type
+) {
+
+    const element =
+        document.getElementById(
+            "loginMessage"
+        );
+
+
+    if (!element) {
+
+        return;
+
+    }
+
+
+    element.textContent =
+        message;
+
+
+    element.className =
+        `login-message ${type}`;
+
+}
+
+
+// =====================================================
+// BASIC AUTH HEADER
+// =====================================================
+
+function getAuthorizationHeader() {
+
+    if (
+        !authState.username ||
+        !authState.password
+    ) {
+
+        return null;
+
+    }
+
+
+    const credentials =
+        btoa(
+            `${authState.username}:${authState.password}`
+        );
+
+
+    return `Basic ${credentials}`;
+
+}
+
+
+// =====================================================
+// AUTHENTICATED FETCH
+// =====================================================
+
+async function authenticatedFetch(
+    url,
+    options = {}
+) {
+
+    if (!authState.authenticated) {
+
+        throw new Error(
+            "Authentication required."
+        );
+
+    }
+
+
+    const headers = {
+
+        ...(options.headers || {}),
+
+        "Authorization":
+            getAuthorizationHeader()
+
+    };
+
+
+    return fetch(
+        url,
+        {
+            ...options,
+            headers
+        }
+    );
+
+}
+
+
+// =====================================================
+// UNAUTHORIZED HANDLER
+// =====================================================
+
+function handleUnauthorized() {
+
+    alert(
+        "Authentication failed. Please login again."
+    );
+
+
+    logoutUser();
+
+}
+
+
+// =====================================================
+// FORBIDDEN HANDLER
+// =====================================================
+
+async function handleForbidden(
+    response
+) {
+
+    let errorData = {};
+
+
+    try {
+
+        errorData =
+            await response.json();
+
+    }
+
+    catch (ignored) {
+
+        // Backend may return non-JSON response.
+
+    }
+
+
+    alert(
+        errorData.message ||
+        "You are not authorized for this decision persona."
+    );
+
+}
 
 
 // =====================================================
@@ -41,6 +730,22 @@ document.addEventListener("DOMContentLoaded", () => {
 // =====================================================
 
 async function analyzeCSV() {
+
+    /*
+     * Single-file API is also protected by
+     * Spring Security.
+     */
+
+    if (!authState.authenticated) {
+
+        alert(
+            "Please login before running analysis."
+        );
+
+        return;
+
+    }
+
 
     const fileInput =
         document.getElementById("csvFile");
@@ -58,15 +763,21 @@ async function analyzeCSV() {
         fileInput.files.length === 0
     ) {
 
-        status.textContent =
-            "❌ Please select a CSV or Excel file first.";
+        if (status) {
+
+            status.textContent =
+                "❌ Please select a CSV or Excel file first.";
+
+        }
 
         return;
+
     }
 
 
     const file =
         fileInput.files[0];
+
 
     const fileName =
         file.name.toLowerCase();
@@ -80,15 +791,21 @@ async function analyzeCSV() {
 
     if (!isSupported) {
 
-        status.textContent =
-            "❌ Please upload a CSV, XLSX or XLS file.";
+        if (status) {
+
+            status.textContent =
+                "❌ Please upload a CSV, XLSX or XLS file.";
+
+        }
 
         return;
+
     }
 
 
     const formData =
         new FormData();
+
 
     formData.append(
         "file",
@@ -96,15 +813,20 @@ async function analyzeCSV() {
     );
 
 
-    status.textContent =
-        "⏳ Analyzing " +
-        file.name +
-        "...";
+    if (status) {
+
+        status.textContent =
+            "⏳ Analyzing " +
+            file.name +
+            "...";
+
+    }
 
 
     if (analyzeBtn) {
 
-        analyzeBtn.disabled = true;
+        analyzeBtn.disabled =
+            true;
 
         analyzeBtn.textContent =
             "⏳ Analyzing...";
@@ -115,13 +837,33 @@ async function analyzeCSV() {
     try {
 
         const response =
-            await fetch(
+            await authenticatedFetch(
                 `${API}/csv/upload`,
                 {
                     method: "POST",
                     body: formData
                 }
             );
+
+
+        if (response.status === 401) {
+
+            handleUnauthorized();
+
+            return;
+
+        }
+
+
+        if (response.status === 403) {
+
+            await handleForbidden(
+                response
+            );
+
+            return;
+
+        }
 
 
         const responseText =
@@ -134,9 +876,12 @@ async function analyzeCSV() {
         try {
 
             data =
-                JSON.parse(responseText);
+                JSON.parse(
+                    responseText
+                );
 
         }
+
         catch (error) {
 
             throw new Error(
@@ -244,218 +989,333 @@ async function analyzeCSV() {
         // =================================================
 
         const revenueElement =
-            document.getElementById("revenue");
+            document.getElementById(
+                "revenue"
+            );
 
         const quantityElement =
-            document.getElementById("quantity");
+            document.getElementById(
+                "quantity"
+            );
 
         const categoriesElement =
-            document.getElementById("categories");
+            document.getElementById(
+                "categories"
+            );
 
         const revenueLabel =
-            document.getElementById("revenueLabel");
+            document.getElementById(
+                "revenueLabel"
+            );
 
         const quantityLabel =
-            document.getElementById("quantityLabel");
+            document.getElementById(
+                "quantityLabel"
+            );
 
         const categoryLabel =
-            document.getElementById("categoryLabel");
+            document.getElementById(
+                "categoryLabel"
+            );
 
         const categoryTitle =
-            document.getElementById("categoryTitle");
+            document.getElementById(
+                "categoryTitle"
+            );
 
 
         // =================================================
-        // DYNAMIC SINGLE-SOURCE KPI DISPLAY
+        // INVENTORY
         // =================================================
 
         if (metricType === "inventory") {
 
             if (revenueLabel) {
+
                 revenueLabel.textContent =
                     "📦 Total Inventory";
+
             }
+
 
             if (quantityLabel) {
+
                 quantityLabel.textContent =
                     "📅 Stockout Days";
+
             }
+
 
             if (categoryLabel) {
+
                 categoryLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryTitle) {
+
                 categoryTitle.textContent =
                     "📊 Inventory by Product";
+
             }
 
+
             if (revenueElement) {
+
                 revenueElement.textContent =
                     Number(
                         data.totalInventory || 0
                     ).toLocaleString();
+
             }
 
+
             if (quantityElement) {
+
                 quantityElement.textContent =
                     Number(
                         data.totalStockoutDays || 0
                     ).toLocaleString();
+
             }
 
         }
 
+
+        // =================================================
+        // QUANTITY
+        // =================================================
 
         else if (metricType === "quantity") {
 
             if (revenueLabel) {
+
                 revenueLabel.textContent =
                     "📦 Total Quantity";
+
             }
+
 
             if (quantityLabel) {
+
                 quantityLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryLabel) {
+
                 categoryLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryTitle) {
+
                 categoryTitle.textContent =
                     "📊 Quantity by Product";
+
             }
 
+
             if (revenueElement) {
+
                 revenueElement.textContent =
                     Number(
                         data.totalQuantity || 0
                     ).toLocaleString();
+
             }
 
+
             if (quantityElement) {
+
                 quantityElement.textContent =
                     categoryCount.toLocaleString();
+
             }
 
         }
 
+
+        // =================================================
+        // COMPLAINTS
+        // =================================================
 
         else if (metricType === "complaints") {
 
             if (revenueLabel) {
+
                 revenueLabel.textContent =
                     "⚠️ Total Complaints";
+
             }
+
 
             if (quantityLabel) {
+
                 quantityLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryLabel) {
+
                 categoryLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryTitle) {
+
                 categoryTitle.textContent =
                     "📊 Complaints by Category";
+
             }
 
+
             if (revenueElement) {
+
                 revenueElement.textContent =
                     Number(
                         data.totalComplaints || 0
                     ).toLocaleString();
+
             }
 
+
             if (quantityElement) {
+
                 quantityElement.textContent =
                     categoryCount.toLocaleString();
+
             }
 
         }
 
 
+        // =================================================
+        // STOCKOUT
+        // =================================================
+
         else if (metricType === "stockout") {
 
             if (revenueLabel) {
+
                 revenueLabel.textContent =
                     "⏱️ Total Stockout Hours";
+
             }
+
 
             if (quantityLabel) {
+
                 quantityLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryLabel) {
+
                 categoryLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryTitle) {
+
                 categoryTitle.textContent =
                     "📊 Stockout by Product";
+
             }
 
+
             if (revenueElement) {
+
                 revenueElement.textContent =
                     Number(
                         data.totalStockoutHours ??
                         data.totalStockoutDays ??
                         0
                     ).toLocaleString();
+
             }
 
+
             if (quantityElement) {
+
                 quantityElement.textContent =
                     categoryCount.toLocaleString();
+
             }
 
         }
 
 
+        // =================================================
+        // REVENUE DEFAULT
+        // =================================================
+
         else {
 
             if (revenueLabel) {
+
                 revenueLabel.textContent =
                     "💰 Total Revenue";
+
             }
+
 
             if (quantityLabel) {
+
                 quantityLabel.textContent =
                     "📦 Total Quantity";
+
             }
+
 
             if (categoryLabel) {
+
                 categoryLabel.textContent =
                     "📊 Categories";
+
             }
+
 
             if (categoryTitle) {
+
                 categoryTitle.textContent =
                     "📊 Category Revenue";
+
             }
 
+
             if (revenueElement) {
+
                 revenueElement.textContent =
                     "₹" +
                     Number(
                         data.totalRevenue || 0
                     ).toLocaleString();
+
             }
 
+
             if (quantityElement) {
+
                 quantityElement.textContent =
                     Number(
                         data.totalQuantity || 0
                     ).toLocaleString();
+
             }
 
         }
@@ -474,7 +1334,7 @@ async function analyzeCSV() {
 
 
         // =================================================
-        // CATEGORY / PRODUCT PERFORMANCE
+        // CATEGORY PERFORMANCE
         // =================================================
 
         const categoryContainer =
@@ -485,7 +1345,8 @@ async function analyzeCSV() {
 
         if (categoryContainer) {
 
-            categoryContainer.innerHTML = "";
+            categoryContainer.innerHTML =
+                "";
 
 
             if (
@@ -615,7 +1476,7 @@ async function analyzeCSV() {
 
 
         // =================================================
-        // SINGLE SOURCE AI INSIGHTS
+        // AI INSIGHTS
         // =================================================
 
         const insightsElement =
@@ -692,70 +1553,107 @@ async function analyzeCSV() {
             insightsElement.innerHTML = `
 
                 <div class="insight">
+
                     📊 <strong>KPI:</strong>
+
                     ${escapeHTML(
                         data.kpi || "N/A"
                     )}
+
                 </div>
 
+
                 <div class="insight">
+
                     🎯 <strong>Detected Driver:</strong>
+
                     ${escapeHTML(
                         data.driver || "N/A"
                     )}
+
                 </div>
 
+
                 <div class="insight">
+
                     🏆 <strong>Top Contributor:</strong>
+
                     ${escapeHTML(
                         data.topCategory || "N/A"
                     )}
+
                     —
+
                     ${topValueDisplay}
+
                 </div>
 
+
                 <div class="insight">
+
                     🧠 <strong>Intelligence Narrative:</strong>
+
                     ${escapeHTML(
                         aiNarrative
                     )}
+
                 </div>
 
+
                 <div class="insight">
+
                     💡 <strong>Recommended Action:</strong>
+
                     ${escapeHTML(
                         aiRecommendation
                     )}
+
                 </div>
 
+
                 <div class="insight">
+
                     📈 <strong>Confidence:</strong>
+
                     ${formatConfidence(
                         data.confidence
                     )}
+
                 </div>
 
+
                 <div class="insight">
+
                     🔬 <strong>Analytical Method:</strong>
+
                     ${escapeHTML(
                         data.analyticalMethod ||
                         "N/A"
                     )}
+
                 </div>
 
+
                 <div class="insight">
+
                     📁 <strong>File:</strong>
+
                     ${escapeHTML(
                         data.fileName ||
                         file.name
                     )}
+
                 </div>
 
+
                 <div class="insight">
+
                     📋 <strong>Data Quality:</strong>
+
                     ${Number(
                         data.dataQuality || 0
                     ).toFixed(1)}%
+
                 </div>
 
             `;
@@ -763,10 +1661,14 @@ async function analyzeCSV() {
         }
 
 
-        status.textContent =
-            "✅ " +
-            file.name +
-            " analyzed successfully.";
+        if (status) {
+
+            status.textContent =
+                "✅ " +
+                file.name +
+                " analyzed successfully.";
+
+        }
 
     }
 
@@ -779,9 +1681,13 @@ async function analyzeCSV() {
         );
 
 
-        status.textContent =
-            "❌ " +
-            error.message;
+        if (status) {
+
+            status.textContent =
+                "❌ " +
+                error.message;
+
+        }
 
     }
 
@@ -801,8 +1707,6 @@ async function analyzeCSV() {
     }
 
 }
-
-
 // =====================================================
 // MULTI-SOURCE ANALYSIS API
 // =====================================================
@@ -810,71 +1714,209 @@ async function analyzeCSV() {
 async function analyzeMultiSource(
     salesFile,
     inventoryFile,
-    marketingFile
+    marketingFile,
+    persona
 ) {
 
+    // =================================================
+    // AUTHENTICATION CHECK
+    // =================================================
+
+    if (!authState.authenticated) {
+
+        throw new Error(
+            "Please login before analysis."
+        );
+
+    }
+
+
+    // =================================================
+    // FILE VALIDATION
+    // =================================================
+
     if (!salesFile) {
+
         throw new Error(
             "Sales file is missing."
         );
+
     }
 
+
     if (!inventoryFile) {
+
         throw new Error(
             "Inventory file is missing."
         );
+
     }
 
+
     if (!marketingFile) {
+
         throw new Error(
             "Marketing file is missing."
         );
+
     }
 
+
+    // =================================================
+    // AUTHORIZED PERSONA
+    // =================================================
+
+    /*
+     * Persona is taken from authenticated state.
+     *
+     * Do NOT trust a freely editable UI persona.
+     */
+
+    const authorizedPersona =
+        authState.persona;
+
+
+    if (!authorizedPersona) {
+
+        throw new Error(
+            "No authorized decision persona found."
+        );
+
+    }
+
+
+    // =================================================
+    // FORM DATA
+    // =================================================
 
     const formData =
         new FormData();
 
 
     formData.append(
-        "sales",
+        "salesFile",
         salesFile
     );
 
+
     formData.append(
-        "inventory",
+        "inventoryFile",
         inventoryFile
     );
 
+
     formData.append(
-        "marketing",
+        "marketingFile",
         marketingFile
     );
 
+
+    /*
+     * Backend receives the persona.
+     *
+     * Backend should ALSO validate that the persona
+     * matches the authenticated Spring Security role.
+     */
+
+    formData.append(
+        "persona",
+        authorizedPersona
+    );
+
+
+    // =================================================
+    // DEBUG
+    // =================================================
 
     console.log(
         "Sending multi-source analysis..."
     );
 
 
+    console.log(
+        "Authenticated user:",
+        authState.username
+    );
+
+
+    console.log(
+        "Authenticated role:",
+        authState.role
+    );
+
+
+    console.log(
+        "Authorized persona:",
+        authorizedPersona
+    );
+
+
+    // =================================================
+    // API REQUEST
+    // =================================================
+
     const response =
-        await fetch(
+        await authenticatedFetch(
             `${API}/analysis/multi-source`,
             {
                 method: "POST",
+
+                /*
+                 * DO NOT manually set Content-Type.
+                 *
+                 * FormData automatically creates the
+                 * correct multipart/form-data boundary.
+                 */
+
                 body: formData
             }
         );
-
-
-    const responseText =
-        await response.text();
 
 
     console.log(
         "Multi-source HTTP status:",
         response.status
     );
+
+
+    // =================================================
+    // 401 UNAUTHORIZED
+    // =================================================
+
+    if (response.status === 401) {
+
+        handleUnauthorized();
+
+        throw new Error(
+            "Authentication failed."
+        );
+
+    }
+
+
+    // =================================================
+    // 403 FORBIDDEN
+    // =================================================
+
+    if (response.status === 403) {
+
+        await handleForbidden(
+            response
+        );
+
+        throw new Error(
+            "You are not authorized for this decision persona."
+        );
+
+    }
+
+
+    // =================================================
+    // READ RESPONSE
+    // =================================================
+
+    const responseText =
+        await response.text();
 
 
     console.log(
@@ -886,14 +1928,25 @@ async function analyzeMultiSource(
     let data;
 
 
+    // =================================================
+    // PARSE JSON
+    // =================================================
+
     try {
 
         data =
-            JSON.parse(responseText);
+            JSON.parse(
+                responseText
+            );
 
     }
 
     catch (error) {
+
+        console.error(
+            "Invalid backend response:",
+            error
+        );
 
         throw new Error(
             responseText ||
@@ -902,6 +1955,10 @@ async function analyzeMultiSource(
 
     }
 
+
+    // =================================================
+    // RESPONSE VALIDATION
+    // =================================================
 
     if (!response.ok) {
 
@@ -914,13 +1971,368 @@ async function analyzeMultiSource(
     }
 
 
+    // =================================================
+    // SAVE LAST ANALYSIS
+    // =================================================
+
     console.log(
         "Multi-source analysis result:",
         data
     );
 
 
+    window.lastAnalysisResult =
+        data;
+
+
+    // =================================================
+    // ABSTENTION UI
+    // =================================================
+
+    renderAbstentionState(
+        data
+    );
+
+
+    // =================================================
+    // FEEDBACK UI
+    // =================================================
+
+    const feedbackSection =
+        document.getElementById(
+            "feedbackSection"
+        );
+
+
+    if (feedbackSection) {
+
+        feedbackSection.style.display =
+            "block";
+
+    }
+
+
+    // =================================================
+    // DEBUG TOTALS
+    // =================================================
+
+    console.log(
+        "TOTAL REVENUE:",
+        data.totalRevenue
+    );
+
+
+    console.log(
+        "TOTAL QUANTITY:",
+        data.totalQuantity
+    );
+
+
+    console.log(
+        "TOTAL INVENTORY:",
+        data.totalInventory
+    );
+
+
+    console.log(
+        "TOTAL STOCKOUT HOURS:",
+        data.totalStockoutHours
+    );
+
+
+    console.log(
+        "MARKETING SPEND:",
+        data.marketingSpend
+    );
+
+
+    console.log(
+        "MARKETING CONVERSIONS:",
+        data.marketingConversions
+    );
+
+
+    console.log(
+        "CONFIDENCE:",
+        data.confidence
+    );
+
+
+    console.log(
+        "ABSTAINED:",
+        data.abstained
+    );
+
+
+    // =================================================
+    // RETURN
+    // =================================================
+
     return data;
+
+}
+
+
+// =====================================================
+// MULTI-SOURCE BUTTON
+// =====================================================
+
+async function runMultiSourceAnalysis() {
+
+    // =================================================
+    // AUTHENTICATION CHECK
+    // =================================================
+
+    if (!authState.authenticated) {
+
+        alert(
+            "Please login before running analysis."
+        );
+
+        return;
+
+    }
+
+
+    if (!authState.persona) {
+
+        alert(
+            "No authorized decision persona found."
+        );
+
+        return;
+
+    }
+
+
+    // =================================================
+    // INPUT ELEMENTS
+    // =================================================
+
+    const salesInput =
+        document.getElementById(
+            "salesFile"
+        );
+
+
+    const inventoryInput =
+        document.getElementById(
+            "inventoryFile"
+        );
+
+
+    const marketingInput =
+        document.getElementById(
+            "marketingFile"
+        );
+
+
+    const personaSelect =
+        document.getElementById(
+            "personaSelect"
+        );
+
+
+    const button =
+        document.getElementById(
+            "multiSourceBtn"
+        );
+
+
+    const status =
+        document.getElementById(
+            "multiSourceStatus"
+        );
+
+
+    // =================================================
+    // FILES
+    // =================================================
+
+    const salesFile =
+        salesInput?.files[0];
+
+
+    const inventoryFile =
+        inventoryInput?.files[0];
+
+
+    const marketingFile =
+        marketingInput?.files[0];
+
+
+    /*
+     * Do NOT trust personaSelect.value.
+     *
+     * Persona comes from authenticated state.
+     */
+
+    const persona =
+        authState.persona;
+
+
+    // =================================================
+    // FILE VALIDATION
+    // =================================================
+
+    if (!salesFile) {
+
+        if (status) {
+
+            status.textContent =
+                "❌ Please select sales.csv.";
+
+        }
+
+        return;
+
+    }
+
+
+    if (!inventoryFile) {
+
+        if (status) {
+
+            status.textContent =
+                "❌ Please select inventory.csv.";
+
+        }
+
+        return;
+
+    }
+
+
+    if (!marketingFile) {
+
+        if (status) {
+
+            status.textContent =
+                "❌ Please select marketing.csv.";
+
+        }
+
+        return;
+
+    }
+
+
+    // =================================================
+    // LOADING STATE
+    // =================================================
+
+    if (button) {
+
+        button.disabled =
+            true;
+
+        button.textContent =
+            "⏳ Analyzing...";
+
+    }
+
+
+    if (status) {
+
+        status.textContent =
+            "⏳ Analyzing for " +
+            persona +
+            "...";
+
+    }
+
+
+    // =================================================
+    // RUN ANALYSIS
+    // =================================================
+
+    try {
+
+        const data =
+            await analyzeMultiSource(
+                salesFile,
+                inventoryFile,
+                marketingFile,
+                persona
+            );
+
+
+        // =================================================
+        // DISPLAY RESULT
+        // =================================================
+
+        displayMultiSourceResult(
+            data
+        );
+
+
+        // =================================================
+        // STATUS
+        // =================================================
+
+        if (status) {
+
+            if (
+                data &&
+                data.abstained === true
+            ) {
+
+                status.textContent =
+                    "⚠️ Analysis completed with abstention for " +
+                    persona +
+                    ".";
+
+            }
+
+            else {
+
+                status.textContent =
+                    "✅ Analysis completed for " +
+                    persona +
+                    ".";
+
+            }
+
+        }
+
+    }
+
+
+    catch (error) {
+
+        console.error(
+            "Multi-source error:",
+            error
+        );
+
+
+        if (status) {
+
+            status.textContent =
+                "❌ " +
+                (
+                    error.message ||
+                    "Analysis failed."
+                );
+
+        }
+
+    }
+
+
+    finally {
+
+        if (button) {
+
+            button.disabled =
+                false;
+
+            button.textContent =
+                "🔍 Analyze All Sources";
+
+        }
+
+    }
 
 }
 
@@ -929,10 +2341,18 @@ async function analyzeMultiSource(
 // MULTI-SOURCE RESULT DISPLAY
 // =====================================================
 
-function displayMultiSourceResult(data) {
+function displayMultiSourceResult(
+    data
+) {
 
     if (!data) {
+
+        console.error(
+            "No multi-source result received."
+        );
+
         return;
+
     }
 
 
@@ -943,34 +2363,53 @@ function displayMultiSourceResult(data) {
 
 
     // =================================================
-    // UPDATE TOP KPI CARDS
+    // KPI ELEMENTS
     // =================================================
 
     const revenueElement =
-        document.getElementById("revenue");
+        document.getElementById(
+            "revenue"
+        );
+
 
     const quantityElement =
-        document.getElementById("quantity");
+        document.getElementById(
+            "quantity"
+        );
+
 
     const categoriesElement =
-        document.getElementById("categories");
+        document.getElementById(
+            "categories"
+        );
 
 
     const revenueLabel =
-        document.getElementById("revenueLabel");
+        document.getElementById(
+            "revenueLabel"
+        );
+
 
     const quantityLabel =
-        document.getElementById("quantityLabel");
+        document.getElementById(
+            "quantityLabel"
+        );
+
 
     const categoryLabel =
-        document.getElementById("categoryLabel");
+        document.getElementById(
+            "categoryLabel"
+        );
+
 
     const categoryTitle =
-        document.getElementById("categoryTitle");
+        document.getElementById(
+            "categoryTitle"
+        );
 
 
     // =================================================
-    // TOP KPI 1 — REVENUE
+    // REVENUE
     // =================================================
 
     if (revenueLabel) {
@@ -986,14 +2425,14 @@ function displayMultiSourceResult(data) {
         revenueElement.textContent =
             "₹" +
             Number(
-                data.totalRevenue || 0
+                data.totalRevenue ?? 0
             ).toLocaleString();
 
     }
 
 
     // =================================================
-    // TOP KPI 2 — QUANTITY
+    // QUANTITY
     // =================================================
 
     if (quantityLabel) {
@@ -1008,20 +2447,20 @@ function displayMultiSourceResult(data) {
 
         quantityElement.textContent =
             Number(
-                data.totalQuantity || 0
+                data.totalQuantity ?? 0
             ).toLocaleString();
 
     }
 
 
     // =================================================
-    // TOP KPI 3 — INVENTORY
+    // INVENTORY
     // =================================================
 
     if (categoryLabel) {
 
         categoryLabel.textContent =
-            "🏭 Total Inventory";
+            "🏭 Inventory Stock Units";
 
     }
 
@@ -1030,14 +2469,14 @@ function displayMultiSourceResult(data) {
 
         categoriesElement.textContent =
             Number(
-                data.totalStock || 0
+                data.totalInventory ?? 0
             ).toLocaleString();
 
     }
 
 
     // =================================================
-    // MULTI-SOURCE KPI OVERVIEW
+    // CATEGORY TITLE
     // =================================================
 
     if (categoryTitle) {
@@ -1047,6 +2486,10 @@ function displayMultiSourceResult(data) {
 
     }
 
+
+    // =================================================
+    // CATEGORY CONTAINER
+    // =================================================
 
     const categoryContainer =
         document.getElementById(
@@ -1059,11 +2502,60 @@ function displayMultiSourceResult(data) {
         categoryContainer.innerHTML = `
 
             <div class="insight">
-                ✅ <strong>Sales, Inventory and Marketing data successfully analyzed.</strong>
+
+                ✅ <strong>
+                    Sales, Inventory and Marketing
+                    data successfully analyzed.
+                </strong>
+
             </div>
 
+
             <div class="insight">
-                📊 Cross-source KPI movements, driver impact and evidence are available in the AI Insights section.
+
+                📊 Cross-source KPI movements,
+                driver impact and evidence are
+                available in the AI Insights section.
+
+            </div>
+
+
+            <div class="insight">
+
+                ⏱️ <strong>
+                    Total Stockout Hours:
+                </strong>
+
+                ${Number(
+                    data.totalStockoutHours ?? 0
+                ).toLocaleString()}
+
+            </div>
+
+
+            <div class="insight">
+
+                📣 <strong>
+                    Marketing Spend:
+                </strong>
+
+                ₹${Number(
+                    data.marketingSpend ?? 0
+                ).toLocaleString()}
+
+            </div>
+
+
+            <div class="insight">
+
+                ✅ <strong>
+                    Marketing Conversions:
+                </strong>
+
+                ${Number(
+                    data.marketingConversions ?? 0
+                ).toLocaleString()}
+
             </div>
 
         `;
@@ -1072,7 +2564,7 @@ function displayMultiSourceResult(data) {
 
 
     // =================================================
-    // AI INSIGHTS ELEMENT
+    // INSIGHTS ELEMENT
     // =================================================
 
     const insightsElement =
@@ -1093,27 +2585,49 @@ function displayMultiSourceResult(data) {
 
 
     // =================================================
-    // DRIVER MOVEMENT SIGNALS
+    // PERSONA
+    // =================================================
+
+    const persona =
+        data.persona ||
+        authState.persona ||
+        "Unknown";
+
+
+    // =================================================
+    // DRIVER MOVEMENTS
     // =================================================
 
     let driverHTML =
         "";
 
 
+    const driverMovements =
+        data.driverMovements ||
+        data.driverContributions ||
+        {};
+
+
     if (
-        data.driverContributions &&
-        typeof data.driverContributions === "object"
+        driverMovements &&
+        typeof driverMovements === "object"
     ) {
 
         driverHTML += `
+
             <div class="insight">
-                📊 <strong>Driver Movement Signals</strong>
+
+                📊 <strong>
+                    Driver Movement Signals
+                </strong>
+
             </div>
+
         `;
 
 
         Object.entries(
-            data.driverContributions
+            driverMovements
         ).forEach(
             ([driver, value]) => {
 
@@ -1121,53 +2635,28 @@ function displayMultiSourceResult(data) {
                     Number(value);
 
 
-                let formattedValue;
-
-
-                // Percentage-based drivers
-                if (
-                    driver === "Sales Volume" ||
-                    driver === "Average Price" ||
-                    driver === "Inventory Availability" ||
-                    driver === "Marketing Conversions"
-                ) {
-
-                    formattedValue =
-                        (numericValue >= 0 ? "+" : "") +
-                        numericValue.toFixed(2) +
-                        "%";
-
-                }
-
-
-                // Stockout = hours
-                else if (
-                    driver === "Stockout Hours"
-                ) {
-
-                    formattedValue =
-                        (numericValue >= 0 ? "+" : "") +
-                        numericValue.toFixed(2) +
-                        " hours";
-
-                }
-
-
-                else {
-
-                    formattedValue =
-                        numericValue.toFixed(2);
-
-                }
+                const formattedValue =
+                    (
+                        numericValue >= 0
+                            ? "+"
+                            : ""
+                    ) +
+                    numericValue.toFixed(2) +
+                    "%";
 
 
                 driverHTML += `
+
                     <div class="insight">
+
                         📌 <strong>
                             ${escapeHTML(driver)}
                         :</strong>
+
                         ${formattedValue}
+
                     </div>
+
                 `;
 
             }
@@ -1190,9 +2679,15 @@ function displayMultiSourceResult(data) {
     ) {
 
         impactHTML += `
+
             <div class="insight">
-                🎯 <strong>Driver Impact Ranking</strong>
+
+                🎯 <strong>
+                    Driver Impact Ranking
+                </strong>
+
             </div>
+
         `;
 
 
@@ -1202,7 +2697,8 @@ function displayMultiSourceResult(data) {
             )
             .sort(
                 ([, a], [, b]) =>
-                    Number(b) - Number(a)
+                    Number(b) -
+                    Number(a)
             );
 
 
@@ -1246,17 +2742,26 @@ function displayMultiSourceResult(data) {
 
 
                 impactHTML += `
+
                     <div class="insight">
+
                         ${icon}
+
                         <strong>
                             ${escapeHTML(driver)}
                         :</strong>
+
                         ${numericScore.toFixed(2)}
                         / 100
-                        — <strong>
+
+                        —
+
+                        <strong>
                             ${escapeHTML(level)}
                         </strong>
+
                     </div>
+
                 `;
 
             }
@@ -1281,15 +2786,16 @@ function displayMultiSourceResult(data) {
         evidenceHTML =
             data.evidence
                 .map(
-                    (item) => {
+                    (item) => `
 
-                        return `
-                            <div class="insight">
-                                🔎 ${escapeHTML(item)}
-                            </div>
-                        `;
+                        <div class="insight">
 
-                    }
+                            🔎
+                            ${escapeHTML(item)}
+
+                        </div>
+
+                    `
                 )
                 .join("");
 
@@ -1298,61 +2804,181 @@ function displayMultiSourceResult(data) {
     else {
 
         evidenceHTML = `
+
             <div class="insight">
+
                 🔎 No additional evidence available.
+
             </div>
+
         `;
 
     }
 
 
     // =================================================
-    // MOVEMENT PERCENTAGE
+    // MOVEMENT
     // =================================================
 
     const movementPercentage =
         Number(
-            data.movementPercentage || 0
+            data.movementPercentage ?? 0
         );
 
 
     // =================================================
-    // MAIN MULTI-SOURCE AI INSIGHTS
+    // ABSTENTION
+    // =================================================
+
+    let abstentionHTML =
+        "";
+
+
+    if (
+        data.abstained === true
+    ) {
+
+        abstentionHTML = `
+
+            <div class="insight">
+
+                ⚠️ <strong>
+                    Automated Decision Abstained
+                </strong>
+
+                <br><br>
+
+                The system did not issue a
+                recommendation because the
+                available evidence was insufficient
+                or contradictory.
+
+                <br><br>
+
+                <strong>
+                    Clarification:
+                </strong>
+
+                ${escapeHTML(
+                    data.clarificationRequest ||
+                    "Additional evidence is required before a reliable decision can be made."
+                )}
+
+            </div>
+
+        `;
+
+    }
+
+
+    // =================================================
+    // PERSONA NARRATIVE
+    // =================================================
+
+    const personaNarrative =
+        data.personaNarrative ||
+        "No persona-specific narrative available.";
+
+
+    // =================================================
+    // PERSONA ACTION
+    // =================================================
+
+    const personaAction =
+        data.personaAction ||
+        data.recommendation ||
+        "No recommendation available.";
+
+
+    // =================================================
+    // MAIN INSIGHTS
     // =================================================
 
     insightsElement.innerHTML = `
 
         <div class="insight">
-            📊 <strong>KPI:</strong>
+
+            🔐 <strong>
+                Authenticated User:
+            </strong>
+
+            ${escapeHTML(
+                authState.username || "N/A"
+            )}
+
+        </div>
+
+
+        <div class="insight">
+
+            👤 <strong>
+                Authorized Persona:
+            </strong>
+
+            ${escapeHTML(
+                persona
+            )}
+
+        </div>
+
+
+        <div class="insight">
+
+            📊 <strong>
+                KPI:
+            </strong>
+
             ${escapeHTML(
                 data.kpi || "Revenue"
             )}
+
         </div>
 
 
         <div class="insight">
-            📉 <strong>Movement:</strong>
+
+            📉 <strong>
+                Movement:
+            </strong>
+
             ${escapeHTML(
                 data.movement || "N/A"
             )}
-            (${movementPercentage >= 0 ? "+" : ""}
-            ${movementPercentage.toFixed(2)}%)
+
+            (
+
+            ${movementPercentage >= 0 ? "+" : ""}
+
+            ${movementPercentage.toFixed(2)}%
+
+            )
+
         </div>
 
 
         <div class="insight">
-            🎯 <strong>Primary Driver:</strong>
+
+            🎯 <strong>
+                Primary Driver:
+            </strong>
+
             ${escapeHTML(
                 data.primaryDriver || "N/A"
             )}
+
         </div>
 
 
         <div class="insight">
-            🧠 <strong>Driver Explanation:</strong>
+
+            🧠 <strong>
+                Driver Explanation:
+            </strong>
+
             ${escapeHTML(
                 data.driverExplanation || "N/A"
             )}
+
         </div>
 
 
@@ -1363,7 +2989,11 @@ function displayMultiSourceResult(data) {
 
 
         <div class="insight">
-            🔍 <strong>Evidence:</strong>
+
+            🔍 <strong>
+                Evidence
+            </strong>
+
         </div>
 
 
@@ -1371,94 +3001,200 @@ function displayMultiSourceResult(data) {
 
 
         <div class="insight">
-            📈 <strong>Confidence:</strong>
+
+            📈 <strong>
+                Confidence:
+            </strong>
+
             ${formatConfidence(
                 data.confidence
             )}
+
         </div>
 
 
         <div class="insight">
-            🔬 <strong>Analytical Method:</strong>
+
+            🔬 <strong>
+                Analytical Method:
+            </strong>
+
             ${escapeHTML(
                 data.analyticalMethod ||
                 "N/A"
             )}
+
         </div>
 
 
+        ${abstentionHTML}
+
+
         <div class="insight">
-            💡 <strong>Recommended Action:</strong>
+
+            🧠 <strong>
+                Persona Narrative:
+            </strong>
+
             ${escapeHTML(
-                data.recommendation ||
-                "N/A"
+                personaNarrative
             )}
+
         </div>
 
 
         <div class="insight">
-            👤 <strong>Owner:</strong>
+
+            💡 <strong>
+                Persona Action:
+            </strong>
+
+            ${escapeHTML(
+                personaAction
+            )}
+
+        </div>
+
+
+        <div class="insight">
+
+            👤 <strong>
+                Owner:
+            </strong>
+
             ${escapeHTML(
                 data.owner ||
                 "N/A"
             )}
+
         </div>
 
 
         <div class="insight">
-            📡 <strong>Monitoring Plan:</strong>
+
+            📡 <strong>
+                Monitoring Plan:
+            </strong>
+
             ${escapeHTML(
                 data.monitoringPlan ||
                 "N/A"
             )}
+
         </div>
 
 
+        <!-- =========================================
+             BACKEND VERIFIED TOTALS
+             ========================================= -->
+
         <div class="insight">
-            💰 <strong>Total Revenue:</strong>
+
+            💰 <strong>
+                Total Revenue:
+            </strong>
+
             ₹${Number(
-                data.totalRevenue || 0
+                data.totalRevenue ?? 0
             ).toLocaleString()}
+
         </div>
 
 
         <div class="insight">
-            📦 <strong>Total Quantity:</strong>
+
+            📦 <strong>
+                Total Quantity:
+            </strong>
+
             ${Number(
-                data.totalQuantity || 0
+                data.totalQuantity ?? 0
             ).toLocaleString()}
+
         </div>
 
 
         <div class="insight">
-            🏭 <strong>Total Inventory:</strong>
+
+            🏭 <strong>
+                Inventory Stock Units:
+            </strong>
+
             ${Number(
-                data.totalStock || 0
+                data.totalInventory ?? 0
             ).toLocaleString()}
+
         </div>
 
 
         <div class="insight">
-            ⏱️ <strong>Total Stockout Hours:</strong>
+
+            ⏱️ <strong>
+                Total Stockout Hours:
+            </strong>
+
             ${Number(
-                data.totalStockoutHours || 0
+                data.totalStockoutHours ?? 0
             ).toLocaleString()}
+
         </div>
 
 
         <div class="insight">
-            📣 <strong>Marketing Spend:</strong>
+
+            📣 <strong>
+                Marketing Spend:
+            </strong>
+
             ₹${Number(
-                data.totalMarketingSpend || 0
+                data.marketingSpend ?? 0
             ).toLocaleString()}
+
         </div>
 
 
         <div class="insight">
-            ✅ <strong>Marketing Conversions:</strong>
+
+            ✅ <strong>
+                Marketing Conversions:
+            </strong>
+
             ${Number(
-                data.totalConversions || 0
+                data.marketingConversions ?? 0
             ).toLocaleString()}
+
+        </div>
+
+
+        <!-- =========================================
+             DATA ALIGNMENT
+             ========================================= -->
+
+        <div class="insight">
+
+            📅 <strong>
+                Common Aligned Dates:
+            </strong>
+
+            ${Number(
+                data.commonDateCount ?? 0
+            ).toLocaleString()}
+
+        </div>
+
+
+        <div class="insight">
+
+            🧮 <strong>
+                Sparse History:
+            </strong>
+
+            ${
+                data.sparseHistory === true
+                    ? "⚠️ Yes"
+                    : "✅ No"
+            }
+
         </div>
 
     `;
@@ -1467,246 +3203,12 @@ function displayMultiSourceResult(data) {
 
 
 // =====================================================
-// MULTI-SOURCE BUTTON
-// =====================================================
-
-async function runMultiSourceAnalysis() {
-
-    const salesInput =
-        document.getElementById("salesFile");
-
-    const inventoryInput =
-        document.getElementById("inventoryFile");
-
-    const marketingInput =
-        document.getElementById("marketingFile");
-
-    const button =
-        document.getElementById("multiSourceBtn");
-
-    const status =
-        document.getElementById("multiSourceStatus");
-
-
-    const salesFile =
-        salesInput?.files[0];
-
-    const inventoryFile =
-        inventoryInput?.files[0];
-
-    const marketingFile =
-        marketingInput?.files[0];
-
-
-    if (!salesFile) {
-
-        status.textContent =
-            "❌ Please select sales.csv.";
-
-        return;
-
-    }
-
-
-    if (!inventoryFile) {
-
-        status.textContent =
-            "❌ Please select inventory.csv.";
-
-        return;
-
-    }
-
-
-    if (!marketingFile) {
-
-        status.textContent =
-            "❌ Please select marketing.csv.";
-
-        return;
-
-    }
-
-
-    if (button) {
-
-        button.disabled =
-            true;
-
-        button.textContent =
-            "⏳ Analyzing...";
-
-    }
-
-
-    if (status) {
-
-        status.textContent =
-            "⏳ Connecting Sales + Inventory + Marketing...";
-
-    }
-
-
-    try {
-
-        const data =
-            await analyzeMultiSource(
-                salesFile,
-                inventoryFile,
-                marketingFile
-            );
-
-
-        // IMPORTANT:
-        // Correct function name
-        displayMultiSourceResult(
-            data
-        );
-
-
-        if (status) {
-
-            status.textContent =
-                "✅ Multi-source analysis completed successfully.";
-
-        }
-
-    }
-
-
-    catch (error) {
-
-        console.error(
-            "Multi-source error:",
-            error
-        );
-
-
-        if (status) {
-
-            status.textContent =
-                "❌ " +
-                error.message;
-
-        }
-
-    }
-
-
-    finally {
-
-        if (button) {
-
-            button.disabled =
-                false;
-
-            button.textContent =
-                "🔍 Analyze All Sources";
-
-        }
-
-    }
-
-}
-
-
-// =====================================================
-// OPTIONAL HELPER
-// =====================================================
-
-async function runMultiSourceFromInputs() {
-
-    const salesInput =
-        document.getElementById(
-            "salesFile"
-        );
-
-    const inventoryInput =
-        document.getElementById(
-            "inventoryFile"
-        );
-
-    const marketingInput =
-        document.getElementById(
-            "marketingFile"
-        );
-
-
-    const salesFile =
-        salesInput?.files[0];
-
-    const inventoryFile =
-        inventoryInput?.files[0];
-
-    const marketingFile =
-        marketingInput?.files[0];
-
-
-    const status =
-        document.getElementById(
-            "uploadStatus"
-        );
-
-
-    try {
-
-        if (status) {
-
-            status.textContent =
-                "⏳ Analyzing sales + inventory + marketing...";
-
-        }
-
-
-        const data =
-            await analyzeMultiSource(
-                salesFile,
-                inventoryFile,
-                marketingFile
-            );
-
-
-        displayMultiSourceResult(
-            data
-        );
-
-
-        if (status) {
-
-            status.textContent =
-                "✅ Multi-source business analysis completed successfully.";
-
-        }
-
-    }
-
-
-    catch (error) {
-
-        console.error(
-            "Multi-source execution error:",
-            error
-        );
-
-
-        if (status) {
-
-            status.textContent =
-                "❌ " +
-                error.message;
-
-        }
-
-    }
-
-}
-
-
-// =====================================================
 // IMPACT LEVEL
 // =====================================================
 
-function getImpactLevel(score) {
+function getImpactLevel(
+    score
+) {
 
     const value =
         Number(score);
@@ -1735,15 +3237,15 @@ function getImpactLevel(score) {
 // CONFIDENCE FORMATTER
 // =====================================================
 
-function formatConfidence(confidence) {
+function formatConfidence(
+    confidence
+) {
 
     const value =
         Number(confidence);
 
 
-    if (
-        Number.isNaN(value)
-    ) {
+    if (Number.isNaN(value)) {
 
         return "0%";
 
@@ -1767,10 +3269,12 @@ function formatConfidence(confidence) {
 
 
 // =====================================================
-// SECURITY HELPER
+// XSS SAFE HTML
 // =====================================================
 
-function escapeHTML(value) {
+function escapeHTML(
+    value
+) {
 
     const div =
         document.createElement(
@@ -1785,5 +3289,494 @@ function escapeHTML(value) {
 
 
     return div.innerHTML;
+
+}
+
+
+// =====================================================
+// ABSTENTION UI
+// =====================================================
+
+function renderAbstentionState(
+    data
+) {
+
+    /*
+     * Your HTML currently uses:
+     *
+     *     id="insights"
+     *
+     * So this function intentionally uses
+     * "insights" as well.
+     */
+
+    const insightSection =
+        document.getElementById(
+            "insights"
+        );
+
+
+    if (!insightSection) {
+
+        console.error(
+            "AI Insights element not found."
+        );
+
+        return;
+
+    }
+
+
+    // =================================================
+    // NORMAL ANALYSIS
+    // =================================================
+
+    if (
+        !data ||
+        data.abstained !== true
+    ) {
+
+        insightSection.style.display =
+            "block";
+
+        return;
+
+    }
+
+
+    // =================================================
+    // ABSTENTION
+    // =================================================
+
+    insightSection.innerHTML = `
+
+        <div class="abstention-card">
+
+            <div class="abstention-icon">
+                🛑
+            </div>
+
+
+            <div>
+
+                <h3>
+                    Insufficient Evidence —
+                    No Recommendation Issued
+                </h3>
+
+
+                <p>
+
+                    DecisionLens could not establish
+                    enough reliable evidence to produce
+                    a business recommendation.
+
+                </p>
+
+
+                <div class="abstention-reason">
+
+                    <strong>
+                        Why?
+                    </strong>
+
+                    ${
+                        escapeHTML(
+                            data.clarificationRequest ||
+                            "More aligned historical data is required."
+                        )
+                    }
+
+                </div>
+
+
+                <div class="abstention-rule">
+
+                    🔍 Confidence gating is active.
+                    The system abstains instead of
+                    inventing a conclusion.
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    insightSection.style.display =
+        "block";
+
+}
+
+
+// =====================================================
+// OPTIONAL MULTI-SOURCE HELPER
+// =====================================================
+
+async function runMultiSourceFromInputs() {
+
+    if (!authState.authenticated) {
+
+        alert(
+            "Please login before running analysis."
+        );
+
+        return;
+
+    }
+
+
+    const salesInput =
+        document.getElementById(
+            "salesFile"
+        );
+
+
+    const inventoryInput =
+        document.getElementById(
+            "inventoryFile"
+        );
+
+
+    const marketingInput =
+        document.getElementById(
+            "marketingFile"
+        );
+
+
+    const salesFile =
+        salesInput?.files[0];
+
+
+    const inventoryFile =
+        inventoryInput?.files[0];
+
+
+    const marketingFile =
+        marketingInput?.files[0];
+
+
+    const status =
+        document.getElementById(
+            "multiSourceStatus"
+        );
+
+
+    try {
+
+        if (status) {
+
+            status.textContent =
+                "⏳ Analyzing for " +
+                (
+                    authState.persona ||
+                    "authorized persona"
+                ) +
+                "...";
+
+        }
+
+
+        const data =
+            await analyzeMultiSource(
+                salesFile,
+                inventoryFile,
+                marketingFile,
+                authState.persona
+            );
+
+
+        displayMultiSourceResult(
+            data
+        );
+
+
+        if (status) {
+
+            status.textContent =
+                data.abstained === true
+                    ? "⚠️ Analysis completed with abstention."
+                    : "✅ Multi-source analysis completed for " +
+                      (
+                          authState.persona ||
+                          "authorized persona"
+                      ) +
+                      ".";
+
+        }
+
+    }
+
+
+    catch (error) {
+
+        console.error(
+            "Multi-source execution error:",
+            error
+        );
+
+
+        if (status) {
+
+            status.textContent =
+                "❌ " +
+                (
+                    error.message ||
+                    "Analysis failed."
+                );
+
+        }
+
+    }
+
+}
+
+
+// =====================================================
+// FEEDBACK API
+// =====================================================
+
+async function submitFeedback(
+    feedbackType
+) {
+
+    // =================================================
+    // AUTHENTICATION
+    // =================================================
+
+    if (!authState.authenticated) {
+
+        alert(
+            "Please login first."
+        );
+
+        return;
+
+    }
+
+
+    // =================================================
+    // ELEMENTS
+    // =================================================
+
+    const feedbackMessage =
+        document.getElementById(
+            "feedbackMessage"
+        );
+
+
+    const commentElement =
+        document.getElementById(
+            "feedbackComment"
+        );
+
+
+    const comment =
+        commentElement?.value ||
+        "";
+
+
+    // =================================================
+    // CREDENTIALS
+    // =================================================
+
+    const credentials =
+        btoa(
+            `${authState.username}:${authState.password}`
+        );
+
+
+    // =================================================
+    // LAST ANALYSIS
+    // =================================================
+
+    const currentAnalysis =
+        window.lastAnalysisResult ||
+        {};
+
+
+    // =================================================
+    // SEND FEEDBACK
+    // =================================================
+
+    try {
+
+        if (feedbackMessage) {
+
+            feedbackMessage.textContent =
+                "Saving feedback...";
+
+            feedbackMessage.style.color =
+                "#374151";
+
+        }
+
+
+        const response =
+            await fetch(
+                `${API}/feedback`,
+                {
+                    method: "POST",
+
+                    headers: {
+
+                        "Authorization":
+                            `Basic ${credentials}`,
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body: JSON.stringify({
+
+                        feedbackType:
+                            feedbackType,
+
+                        comment:
+                            comment,
+
+                        kpi:
+                            currentAnalysis.kpi ||
+                            "Revenue",
+
+                        primaryDriver:
+                            currentAnalysis.primaryDriver ||
+                            "",
+
+                        confidence:
+                            currentAnalysis.confidence ??
+                            null,
+
+                        abstained:
+                            currentAnalysis.abstained ??
+                            false
+
+                    })
+
+                }
+            );
+
+
+        // =================================================
+        // 401
+        // =================================================
+
+        if (
+            response.status === 401
+        ) {
+
+            logoutUser();
+
+            throw new Error(
+                "Authentication expired. Please login again."
+            );
+
+        }
+
+
+        // =================================================
+        // 403
+        // =================================================
+
+        if (
+            response.status === 403
+        ) {
+
+            throw new Error(
+                "You are not authorized to submit feedback."
+            );
+
+        }
+
+
+        // =================================================
+        // READ RESPONSE
+        // =================================================
+
+        const responseText =
+            await response.text();
+
+
+        let data;
+
+
+        try {
+
+            data =
+                responseText
+                    ? JSON.parse(
+                        responseText
+                    )
+                    : {};
+
+        }
+
+        catch (error) {
+
+            throw new Error(
+                "Feedback API returned an invalid response."
+            );
+
+        }
+
+
+        // =================================================
+        // RESPONSE VALIDATION
+        // =================================================
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.message ||
+                data.error ||
+                "Unable to save feedback."
+            );
+
+        }
+
+
+        // =================================================
+        // SUCCESS
+        // =================================================
+
+        if (feedbackMessage) {
+
+            feedbackMessage.textContent =
+                "✅ Thank you! Feedback recorded.";
+
+            feedbackMessage.style.color =
+                "#16a34a";
+
+        }
+
+    }
+
+
+    catch (error) {
+
+        console.error(
+            "Feedback error:",
+            error
+        );
+
+
+        if (feedbackMessage) {
+
+            feedbackMessage.textContent =
+                "❌ " +
+                (
+                    error.message ||
+                    "Unable to save feedback."
+                );
+
+            feedbackMessage.style.color =
+                "#dc2626";
+
+        }
+
+    }
 
 }

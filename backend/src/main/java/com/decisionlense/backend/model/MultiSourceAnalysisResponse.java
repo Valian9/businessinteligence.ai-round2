@@ -30,14 +30,38 @@ public class MultiSourceAnalysisResponse {
 
     // New: High / Medium / Low impact levels
     private Map<String, String> driverImpactLevels;
-
+    private String persona;
+    private String personaNarrative;
+    private String personaAction; 
     private double totalRevenue;
     private double totalQuantity;
     private double totalStock;
     private double totalStockoutHours;
     private double totalMarketingSpend;
     private double totalConversions;
+public String getPersona() {
+    return persona;
+}
 
+public void setPersona(String persona) {
+    this.persona = persona;
+}
+
+public String getPersonaNarrative() {
+    return personaNarrative;
+}
+
+public void setPersonaNarrative(String personaNarrative) {
+    this.personaNarrative = personaNarrative;
+}
+
+public String getPersonaAction() {
+    return personaAction;
+}
+
+public void setPersonaAction(String personaAction) {
+    this.personaAction = personaAction;
+}
     public MultiSourceAnalysisResponse() {
     }
 

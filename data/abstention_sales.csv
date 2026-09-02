@@ -1,0 +1,4 @@
+date,product,category,region,quantity,unit_price,cost,revenue
+2026-08-01,P101,Electronics,North,100,500,300,50000
+2026-08-02,P101,Electronics,North,105,500,300,52500
+2026-08-03,P101,Electronics,North,98,500,300,49000

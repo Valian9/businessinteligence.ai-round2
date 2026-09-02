@@ -1,82 +1,106 @@
 package com.decisionlense.backend.controller;
 
 import com.decisionlense.backend.service.MultiSourceAnalysisService;
-import org.springframework.http.MediaType;
+import com.decisionlense.backend.service.TelemetryService;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/analysis")
 @CrossOrigin(origins = "*")
 public class MultiSourceAnalysisController {
 
-    private final MultiSourceAnalysisService analysisService;
+    private final MultiSourceAnalysisService multiSourceAnalysisService;
+    private final TelemetryService telemetryService;
 
     public MultiSourceAnalysisController(
-            MultiSourceAnalysisService analysisService
+            MultiSourceAnalysisService multiSourceAnalysisService,
+            TelemetryService telemetryService
     ) {
-        this.analysisService = analysisService;
+        this.multiSourceAnalysisService = multiSourceAnalysisService;
+        this.telemetryService = telemetryService;
     }
 
-    @PostMapping(
-            value = "/multi-source",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
-    public ResponseEntity<?> analyzeMultiSource(
+    @PostMapping("/multi-source")
+    public ResponseEntity<MultiSourceAnalysisService.MultiSourceAnalysisResponse> analyzeMultiSource(
 
-            @RequestParam("sales")
+            @RequestParam("salesFile")
             MultipartFile salesFile,
 
-            @RequestParam("inventory")
+            @RequestParam("inventoryFile")
             MultipartFile inventoryFile,
 
-            @RequestParam("marketing")
-            MultipartFile marketingFile
+            @RequestParam("marketingFile")
+            MultipartFile marketingFile,
 
-    ) {
+            @RequestParam(defaultValue = "Supply Chain Manager")
+            String persona
+
+    ) throws IOException {
+
+        // =====================================================
+        // TELEMETRY START
+        // =====================================================
+
+        long telemetryStart =
+                telemetryService.startTimer();
 
         try {
 
-            if (salesFile == null || salesFile.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body("Sales file is missing or empty.");
-            }
+            // =====================================================
+            // EXISTING ANALYSIS LOGIC
+            // =====================================================
 
-            if (inventoryFile == null || inventoryFile.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body("Inventory file is missing or empty.");
-            }
+            MultiSourceAnalysisService.MultiSourceAnalysisResponse response =
+                    multiSourceAnalysisService.analyze(
+                            salesFile,
+                            inventoryFile,
+                            marketingFile,
+                            persona
+                    );
 
-            if (marketingFile == null || marketingFile.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body("Marketing file is missing or empty.");
-            }
+            // =====================================================
+            // TELEMETRY SUCCESS
+            // =====================================================
 
-            // Directly call the service method without declaring a concrete
-            // response type here; the service method already defines the return type.
-            var response = analysisService.analyze(
-                    salesFile,
-                    inventoryFile,
-                    marketingFile
+            boolean abstained =
+                    response.isAbstained();
+
+            telemetryService.recordRequest(
+                    telemetryStart,
+                    true,
+                    abstained,
+                    0,
+                    0,
+                    0.0
             );
+
+            // =====================================================
+            // RETURN RESPONSE
+            // =====================================================
 
             return ResponseEntity.ok(response);
 
-        } catch (IllegalArgumentException e) {
-
-            return ResponseEntity.badRequest()
-                    .body(e.getMessage());
-
         } catch (Exception e) {
 
-            e.printStackTrace();
+            // =====================================================
+            // TELEMETRY FAILURE
+            // =====================================================
 
-            return ResponseEntity.internalServerError()
-                    .body(
-                            "Multi-source analysis failed: "
-                                    + e.getMessage()
-                    );
+            telemetryService.recordRequest(
+                    telemetryStart,
+                    false,
+                    false,
+                    0,
+                    0,
+                    0.0
+            );
+
+            throw e;
         }
     }
 }

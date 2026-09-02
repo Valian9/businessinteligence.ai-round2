@@ -10,6 +10,7 @@
 
     <title>DecisionLens AI</title>
 
+
     <style>
 
         * {
@@ -19,16 +20,19 @@
             font-family: Arial, Helvetica, sans-serif;
         }
 
+
         body {
             background: #f5f7fb;
             color: #1f2937;
             padding: 30px;
         }
 
+
         .container {
             max-width: 1100px;
             margin: auto;
         }
+
 
         /* ================= HEADER ================= */
 
@@ -37,15 +41,178 @@
             margin-bottom: 30px;
         }
 
+
         header h1 {
             font-size: 36px;
             margin-bottom: 8px;
         }
 
+
         header p {
             color: #6b7280;
             font-size: 17px;
         }
+
+
+        /* ================= AUTHENTICATION ================= */
+
+        .auth-card {
+            background: white;
+            padding: 25px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid #e5e7eb;
+        }
+
+
+        .auth-header {
+            margin-bottom: 20px;
+        }
+
+
+        .auth-header h2 {
+            margin-bottom: 8px;
+        }
+
+
+        .auth-header p {
+            color: #6b7280;
+        }
+
+
+        .auth-form {
+            max-width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+
+        .form-group label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+
+
+        .form-group input:focus {
+            border-color: #2563eb;
+        }
+
+
+        #loginBtn {
+            margin-top: 5px;
+        }
+
+
+        .login-message {
+            margin-top: 14px;
+            font-weight: bold;
+            min-height: 20px;
+        }
+
+
+        .login-message.error {
+            color: #dc2626;
+        }
+
+
+        .login-message.success {
+            color: #16a34a;
+        }
+
+
+        .demo-credentials {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            line-height: 1.8;
+            font-size: 14px;
+        }
+
+
+        .demo-credentials strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+
+        .demo-credentials code {
+            background: #e5e7eb;
+            padding: 3px 6px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+
+
+        /* ================= AUTHENTICATED SESSION ================= */
+
+        .user-session-card {
+            background: white;
+            padding: 18px 22px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid #bbf7d0;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #22c55e;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+
+        .user-role {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+
+        .user-role span {
+            color: #111827;
+            font-weight: bold;
+        }
+
+
+        #logoutBtn {
+            background: #dc2626;
+        }
+
+
+        #logoutBtn:hover {
+            background: #b91c1c;
+        }
+
 
         /* ================= UPLOAD ================= */
 
@@ -58,9 +225,11 @@
             text-align: center;
         }
 
+
         .upload-box h2 {
             margin-bottom: 10px;
         }
+
 
         .upload-box p {
             margin-bottom: 18px;
@@ -68,11 +237,13 @@
             line-height: 1.5;
         }
 
+
         input[type="file"] {
             margin: 10px;
             padding: 10px;
             max-width: 100%;
         }
+
 
         button {
             background: #2563eb;
@@ -86,19 +257,23 @@
             transition: 0.2s;
         }
 
+
         button:hover {
             background: #1d4ed8;
         }
+
 
         button:disabled {
             background: #93c5fd;
             cursor: not-allowed;
         }
 
+
         #uploadStatus {
             margin-top: 15px;
             font-weight: bold;
         }
+
 
         /* ================= MULTI SOURCE ================= */
 
@@ -110,15 +285,18 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
 
+
         .multi-source-box h2 {
             margin-bottom: 10px;
         }
+
 
         .multi-source-box > p {
             color: #6b7280;
             line-height: 1.5;
             margin-bottom: 20px;
         }
+
 
         .source-grid {
             display: grid;
@@ -127,6 +305,7 @@
             margin-bottom: 20px;
         }
 
+
         .source-card {
             background: #f8fafc;
             border: 1px solid #e5e7eb;
@@ -134,10 +313,12 @@
             padding: 18px;
         }
 
+
         .source-card h3 {
             margin-bottom: 8px;
             font-size: 17px;
         }
+
 
         .source-card p {
             color: #6b7280;
@@ -145,19 +326,61 @@
             margin-bottom: 10px;
         }
 
+
         .source-card input {
             width: 100%;
             margin: 0;
         }
 
+
+        /* ================= PERSONA ================= */
+
+        .persona-selector {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+
+
+        .persona-selector label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+
+        .persona-selector select {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+            color: #1f2937;
+            font-size: 15px;
+            cursor: not-allowed;
+        }
+
+
+        .persona-selector select:disabled {
+            background: #f3f4f6;
+            color: #374151;
+            opacity: 1;
+        }
+
+
         .multi-button-area {
             text-align: center;
         }
+
 
         #multiSourceStatus {
             margin-top: 15px;
             font-weight: bold;
         }
+
 
         /* ================= KPI CARDS ================= */
 
@@ -168,6 +391,7 @@
             margin-bottom: 30px;
         }
 
+
         .kpi-card {
             background: white;
             padding: 25px;
@@ -176,15 +400,18 @@
             text-align: center;
         }
 
+
         .kpi-card h3 {
             color: #6b7280;
             margin-bottom: 12px;
             font-size: 16px;
         }
 
+
         .kpi-card strong {
             font-size: 28px;
         }
+
 
         /* ================= SECTIONS ================= */
 
@@ -196,9 +423,11 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
 
+
         .section h2 {
             margin-bottom: 20px;
         }
+
 
         /* ================= CATEGORY ================= */
 
@@ -211,14 +440,17 @@
             gap: 15px;
         }
 
+
         .category-item:last-child {
             border-bottom: none;
         }
+
 
         .category-item strong {
             color: #111827;
             white-space: nowrap;
         }
+
 
         /* ================= INSIGHTS ================= */
 
@@ -231,9 +463,89 @@
             line-height: 1.5;
         }
 
+
         .insight:last-child {
             margin-bottom: 0;
         }
+
+
+        /* ===================================================== */
+        /* FEEDBACK */
+        /* ===================================================== */
+
+        .feedback-card {
+            background: white;
+            padding: 22px;
+            border-radius: 14px;
+            margin-top: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid #e5e7eb;
+        }
+
+
+        .feedback-header h3 {
+            margin-bottom: 6px;
+        }
+
+
+        .feedback-header p {
+            color: #6b7280;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+
+        .feedback-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+
+        .feedback-buttons button {
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            color: #1f2937;
+            padding: 9px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+
+        .feedback-buttons button:hover {
+            background: #eef2ff;
+            transform: translateY(-1px);
+        }
+
+
+        #feedbackComment {
+            width: 100%;
+            margin-top: 15px;
+            padding: 11px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 14px;
+            min-height: 90px;
+        }
+
+
+        #feedbackComment:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+
+        #feedbackMessage {
+            margin-top: 12px;
+            font-weight: 600;
+            min-height: 20px;
+        }
+
 
         /* ================= HOW IT WORKS ================= */
 
@@ -243,22 +555,26 @@
             gap: 15px;
         }
 
+
         .step {
             background: #f8fafc;
             padding: 18px;
             border-radius: 10px;
         }
 
+
         .step h3 {
             margin-bottom: 8px;
             font-size: 17px;
         }
+
 
         .step p {
             color: #6b7280;
             line-height: 1.4;
             font-size: 14px;
         }
+
 
         /* ================= FOOTER ================= */
 
@@ -269,6 +585,7 @@
             padding: 20px;
         }
 
+
         /* ================= MOBILE ================= */
 
         @media (max-width: 800px) {
@@ -277,24 +594,50 @@
                 padding: 15px;
             }
 
+
             .kpi-grid {
                 grid-template-columns: 1fr;
             }
+
 
             .source-grid {
                 grid-template-columns: 1fr;
             }
 
+
             .steps {
                 grid-template-columns: 1fr;
             }
+
 
             header h1 {
                 font-size: 28px;
             }
 
+
             .category-item {
                 font-size: 14px;
+            }
+
+
+            .user-session-card {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+
+            #logoutBtn {
+                width: 100%;
+            }
+
+
+            .feedback-buttons {
+                flex-direction: column;
+            }
+
+
+            .feedback-buttons button {
+                width: 100%;
             }
 
         }
@@ -305,6 +648,7 @@
 
 
 <body>
+
 
 <div class="container">
 
@@ -323,6 +667,137 @@
 
 
     <!-- ===================================================== -->
+    <!-- SECURE AUTHENTICATION -->
+    <!-- ===================================================== -->
+
+    <section class="auth-card" id="authSection">
+
+        <div class="auth-header">
+
+            <h2>🔐 DecisionLens Secure Access</h2>
+
+            <p>
+                Sign in with your authorized business role.
+            </p>
+
+        </div>
+
+
+        <div class="auth-form">
+
+            <div class="form-group">
+
+                <label for="username">
+                    Username
+                </label>
+
+                <input
+                    type="text"
+                    id="username"
+                    placeholder="Enter username"
+                    autocomplete="username"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="password">
+                    Password
+                </label>
+
+                <input
+                    type="password"
+                    id="password"
+                    placeholder="Enter password"
+                    autocomplete="current-password"
+                >
+
+            </div>
+
+
+            <button
+                type="button"
+                id="loginBtn"
+                onclick="loginUser()"
+            >
+                🔐 Login
+            </button>
+
+        </div>
+
+
+        <div
+            id="loginMessage"
+            class="login-message"
+        ></div>
+
+
+        <div class="demo-credentials">
+
+            <strong>Demo Accounts</strong>
+
+            <div>
+                Supply Chain:
+                <code>supply / supply123</code>
+            </div>
+
+            <div>
+                Marketing:
+                <code>marketing / marketing123</code>
+            </div>
+
+            <div>
+                Executive:
+                <code>executive / executive123</code>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ===================================================== -->
+    <!-- AUTHENTICATED USER -->
+    <!-- ===================================================== -->
+
+    <section
+        class="user-session-card"
+        id="userSession"
+        style="display:none;"
+    >
+
+        <div>
+
+            <span class="status-dot"></span>
+
+            <strong id="loggedInUser">
+                Authenticated
+            </strong>
+
+            <div class="user-role">
+
+                Role:
+                <span id="loggedInRole"></span>
+
+            </div>
+
+        </div>
+
+
+        <button
+            type="button"
+            id="logoutBtn"
+            onclick="logoutUser()"
+        >
+            Logout
+        </button>
+
+    </section>
+
+
+    <!-- ===================================================== -->
     <!-- SINGLE FILE UPLOAD -->
     <!-- ===================================================== -->
 
@@ -336,17 +811,24 @@
             performance and trends.
         </p>
 
+
         <input
             type="file"
             id="csvFile"
             accept=".csv,.xlsx,.xls"
         >
 
+
         <br>
 
-        <button id="analyzeBtn">
+
+        <button
+            id="analyzeBtn"
+            type="button"
+        >
             🤖 Analyze with AI
         </button>
+
 
         <p id="uploadStatus">
             No file selected.
@@ -361,7 +843,10 @@
 
     <div class="multi-source-box">
 
-        <h2>🔗 Multi-Source Business Intelligence</h2>
+        <h2>
+            🔗 Multi-Source Business Intelligence
+        </h2>
+
 
         <p>
             Connect Sales, Inventory and Marketing data to detect
@@ -383,6 +868,7 @@
                     Revenue, quantity, price and product performance.
                 </p>
 
+
                 <input
                     type="file"
                     id="salesFile"
@@ -401,6 +887,7 @@
                 <p>
                     Stock availability, stockout hours and supplier delay.
                 </p>
+
 
                 <input
                     type="file"
@@ -421,6 +908,7 @@
                     Campaign spend, clicks and conversion performance.
                 </p>
 
+
                 <input
                     type="file"
                     id="marketingFile"
@@ -432,17 +920,48 @@
         </div>
 
 
+        <!-- ================================================= -->
+        <!-- DECISION PERSONA -->
+        <!-- ================================================= -->
+
+        <div class="persona-selector">
+
+            <label for="personaSelect">
+                👤 Authorized Decision Persona
+            </label>
+
+
+            <select
+                id="personaSelect"
+                disabled
+            >
+
+                <option value="">
+                    🔐 Login required
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- ANALYZE BUTTON -->
+        <!-- ================================================= -->
+
         <div class="multi-button-area">
 
             <button
                 id="multiSourceBtn"
+                type="button"
                 onclick="runMultiSourceAnalysis()"
             >
                 🔍 Analyze All Sources
             </button>
 
+
             <p id="multiSourceStatus">
-                Select all 3 files to begin.
+                🔐 Login and select all 3 files to begin.
             </p>
 
         </div>
@@ -482,23 +1001,24 @@
 
         </div>
 
-<div class="kpi-card">
 
-    <h3 id="categoryLabel">
-        📊 Categories
-    </h3>
+        <div class="kpi-card">
 
-    <strong id="categories">
-        Loading...
-    </strong>
+            <h3 id="categoryLabel">
+                📊 Categories
+            </h3>
 
-</div>
-        
+            <strong id="categories">
+                Loading...
+            </strong>
 
+        </div>
+
+    </div>
 
 
     <!-- ===================================================== -->
-    <!-- CATEGORY PERFORMANCE -->
+    <!-- CATEGORY / MULTI-SOURCE PERFORMANCE -->
     <!-- ===================================================== -->
 
     <div class="section">
@@ -506,10 +1026,20 @@
         <h2 id="categoryTitle">
             📊 Category Performance
         </h2>
-<div id="categoryData">
-  <p>Sales, Inventory and Marketing data will be analyzed here for cross-source KPI movements and driver impact.</p>
-</div>
-        
+
+
+        <div id="categoryData">
+
+            <p>
+                Sales, Inventory and Marketing data will be
+                analyzed here for cross-source KPI movements
+                and driver impact.
+            </p>
+
+        </div>
+
+    </div>
+
 
     <!-- ===================================================== -->
     <!-- AI INSIGHTS -->
@@ -521,11 +1051,12 @@
             🤖 AI Insights
         </h2>
 
+
         <div id="insights">
 
             <div class="insight">
 
-                Upload business data to generate
+                🔐 Login and upload business data to generate
                 KPI intelligence.
 
             </div>
@@ -533,6 +1064,86 @@
         </div>
 
     </div>
+
+
+    <!-- ===================================================== -->
+    <!-- FEEDBACK -->
+    <!-- ===================================================== -->
+
+    <section
+        class="feedback-card"
+        id="feedbackSection"
+        style="display:none;"
+    >
+
+        <div class="feedback-header">
+
+            <h3>
+                🧠 Was this insight useful?
+            </h3>
+
+            <p>
+                Your feedback helps DecisionLens improve
+                future decision support.
+            </p>
+
+        </div>
+
+
+        <div class="feedback-buttons">
+
+            <button
+                type="button"
+                onclick="submitFeedback('HELPFUL')"
+            >
+                👍 Helpful
+            </button>
+
+
+            <button
+                type="button"
+                onclick="submitFeedback('NOT_HELPFUL')"
+            >
+                👎 Not Helpful
+            </button>
+
+
+            <button
+                type="button"
+                onclick="submitFeedback('CORRECT')"
+            >
+                ✅ Correct
+            </button>
+
+
+            <button
+                type="button"
+                onclick="submitFeedback('INCORRECT')"
+            >
+                ⚠️ Incorrect
+            </button>
+
+
+            <button
+                type="button"
+                onclick="submitFeedback('CLARIFICATION_NEEDED')"
+            >
+                ❓ Needs Clarification
+            </button>
+
+        </div>
+
+
+        <textarea
+            id="feedbackComment"
+            placeholder="Optional: tell us what should be improved..."
+            rows="3"
+        ></textarea>
+
+
+        <div id="feedbackMessage"></div>
+
+    </section>
 
 
     <!-- ===================================================== -->
@@ -545,12 +1156,15 @@
             ⚙️ How DecisionLens Works
         </h2>
 
+
         <div class="steps">
 
 
             <div class="step">
 
-                <h3>1. Data Input</h3>
+                <h3>
+                    1. Data Input
+                </h3>
 
                 <p>
                     Business CSV or Excel data is uploaded
@@ -562,7 +1176,9 @@
 
             <div class="step">
 
-                <h3>2. KPI Calculation</h3>
+                <h3>
+                    2. KPI Calculation
+                </h3>
 
                 <p>
                     DecisionLens automatically detects
@@ -575,7 +1191,9 @@
 
             <div class="step">
 
-                <h3>3. Driver Analysis</h3>
+                <h3>
+                    3. Driver Analysis
+                </h3>
 
                 <p>
                     The system identifies important
@@ -588,7 +1206,9 @@
 
             <div class="step">
 
-                <h3>4. AI Narrative</h3>
+                <h3>
+                    4. AI Narrative
+                </h3>
 
                 <p>
                     Analytical results are converted
@@ -601,7 +1221,9 @@
 
             <div class="step">
 
-                <h3>5. Confidence</h3>
+                <h3>
+                    5. Confidence
+                </h3>
 
                 <p>
                     Each insight includes a confidence
@@ -609,7 +1231,6 @@
                 </p>
 
             </div>
-
 
         </div>
 
@@ -633,228 +1254,6 @@
 <!-- ===================================================== -->
 
 <script src="script.js"></script>
-
-
-<script>
-
-/*
- * Multi-source button
- * Connects the three file inputs with the
- * Multi-Source Analysis backend.
- */
-
-async function runMultiSourceAnalysis() {
-
-    const salesInput =
-        document.getElementById("salesFile");
-
-    const inventoryInput =
-        document.getElementById("inventoryFile");
-
-    const marketingInput =
-        document.getElementById("marketingFile");
-
-    const button =
-        document.getElementById("multiSourceBtn");
-
-    const status =
-        document.getElementById("multiSourceStatus");
-
-
-    const salesFile =
-        salesInput.files[0];
-
-    const inventoryFile =
-        inventoryInput.files[0];
-
-    const marketingFile =
-        marketingInput.files[0];
-
-
-    // -------------------------------------------------
-    // Validate files
-    // -------------------------------------------------
-
-    if (!salesFile) {
-
-        status.textContent =
-            "❌ Please select sales.csv.";
-
-        return;
-
-    }
-
-
-    if (!inventoryFile) {
-
-        status.textContent =
-            "❌ Please select inventory.csv.";
-
-        return;
-
-    }
-
-
-    if (!marketingFile) {
-
-        status.textContent =
-            "❌ Please select marketing.csv.";
-
-        return;
-
-    }
-
-
-    // -------------------------------------------------
-    // Loading state
-    // -------------------------------------------------
-
-    button.disabled = true;
-
-    button.textContent =
-        "⏳ Analyzing...";
-
-    status.textContent =
-        "⏳ Connecting Sales + Inventory + Marketing...";
-
-
-    try {
-
-        const formData =
-            new FormData();
-
-
-        formData.append(
-            "sales",
-            salesFile
-        );
-
-
-        formData.append(
-            "inventory",
-            inventoryFile
-        );
-
-
-        formData.append(
-            "marketing",
-            marketingFile
-        );
-
-
-        // -------------------------------------------------
-        // Call backend
-        // -------------------------------------------------
-
-        const response =
-            await fetch(
-                "http://localhost:8080/api/analysis/multi-source",
-                {
-                    method: "POST",
-                    body: formData
-                }
-            );
-
-
-        const responseText =
-            await response.text();
-
-
-        console.log(
-            "Multi-source response:",
-            responseText
-        );
-
-
-        let data;
-
-
-        try {
-
-            data =
-                JSON.parse(responseText);
-
-        }
-        catch (error) {
-
-            throw new Error(
-                responseText ||
-                "Backend returned an invalid response."
-            );
-
-        }
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                data.error ||
-                data.message ||
-                "Multi-source analysis failed."
-            );
-
-        }
-
-
-        console.log(
-            "Multi-source analysis:",
-            data
-        );
-
-
-        // -------------------------------------------------
-        // Display result
-        // -------------------------------------------------
-
-        if (
-            typeof displayMultiSourceResult ===
-            "function"
-        ) {
-
-            displayMultiSourceResult(
-                data
-            );
-
-        }
-
-
-        // -------------------------------------------------
-        // Update status
-        // -------------------------------------------------
-
-        status.textContent =
-            "✅ Multi-source analysis completed successfully.";
-
-
-    }
-    catch (error) {
-
-        console.error(
-            "Multi-source error:",
-            error
-        );
-
-
-        status.textContent =
-            "❌ " +
-            error.message;
-
-    }
-
-
-    finally {
-
-        button.disabled =
-            false;
-
-        button.textContent =
-            "🔍 Analyze All Sources";
-
-    }
-
-}
-
-</script>
 
 
 </body>

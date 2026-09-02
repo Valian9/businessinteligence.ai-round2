@@ -1,50 +1,48 @@
+
 package com.decisionlense.backend.service;
 
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class MultiSourceAnalysisService {
 
+    private static final int MIN_COMMON_DATES = 7;
+    private static final int MIN_SOURCE_RECORDS = 5;
+    private static final int MIN_SOURCE_DATES = 5;
+    private static final double ABSTENTION_THRESHOLD = 0.60;
+
     // =========================================================
-    // SALES RECORD
+    // DATA MODELS
     // =========================================================
 
     public static class SalesRecord {
 
-        private String date;
-        private String productId;
-        private String category;
-        private String region;
-
-        private double quantity;
-        private double unitPrice;
-        private double cost;
-        private double revenue;
-
-        public SalesRecord() {
-        }
+        private final LocalDate date;
+        private final String product;
+        private final String category;
+        private final String region;
+        private final double quantity;
+        private final double unitPrice;
+        private final double cost;
+        private final double revenue;
 
         public SalesRecord(
-                String date,
-                String productId,
+                LocalDate date,
+                String product,
                 String category,
                 String region,
                 double quantity,
@@ -53,7 +51,7 @@ public class MultiSourceAnalysisService {
                 double revenue
         ) {
             this.date = date;
-            this.productId = productId;
+            this.product = product;
             this.category = category;
             this.region = region;
             this.quantity = quantity;
@@ -62,173 +60,101 @@ public class MultiSourceAnalysisService {
             this.revenue = revenue;
         }
 
-        public String getDate() {
+        public LocalDate getDate() {
             return date;
         }
 
-        public void setDate(String date) {
-            this.date = date;
-        }
-
-        public String getProductId() {
-            return productId;
-        }
-
-        public void setProductId(String productId) {
-            this.productId = productId;
+        public String getProduct() {
+            return product;
         }
 
         public String getCategory() {
             return category;
-        }
-
-        public void setCategory(String category) {
-            this.category = category;
         }
 
         public String getRegion() {
             return region;
         }
 
-        public void setRegion(String region) {
-            this.region = region;
-        }
-
         public double getQuantity() {
             return quantity;
-        }
-
-        public void setQuantity(double quantity) {
-            this.quantity = quantity;
         }
 
         public double getUnitPrice() {
             return unitPrice;
         }
 
-        public void setUnitPrice(double unitPrice) {
-            this.unitPrice = unitPrice;
-        }
-
         public double getCost() {
             return cost;
-        }
-
-        public void setCost(double cost) {
-            this.cost = cost;
         }
 
         public double getRevenue() {
             return revenue;
         }
-
-        public void setRevenue(double revenue) {
-            this.revenue = revenue;
-        }
     }
-
-    // =========================================================
-    // INVENTORY RECORD
-    // =========================================================
 
     public static class InventoryRecord {
 
-        private String date;
-        private String productId;
-        private String category;
-
-        private double stockAvailable;
-        private double stockoutHours;
-        private double supplierDelay;
-
-        public InventoryRecord() {
-        }
+        private final LocalDate date;
+        private final String product;
+        private final String category;
+        private final double stockAvailable;
+        private final double stockoutHours;
+        private final double supplierDelay;
 
         public InventoryRecord(
-                String date,
-                String productId,
+                LocalDate date,
+                String product,
                 String category,
                 double stockAvailable,
                 double stockoutHours,
                 double supplierDelay
         ) {
             this.date = date;
-            this.productId = productId;
+            this.product = product;
             this.category = category;
             this.stockAvailable = stockAvailable;
             this.stockoutHours = stockoutHours;
             this.supplierDelay = supplierDelay;
         }
 
-        public String getDate() {
+        public LocalDate getDate() {
             return date;
         }
 
-        public void setDate(String date) {
-            this.date = date;
-        }
-
-        public String getProductId() {
-            return productId;
-        }
-
-        public void setProductId(String productId) {
-            this.productId = productId;
+        public String getProduct() {
+            return product;
         }
 
         public String getCategory() {
             return category;
         }
 
-        public void setCategory(String category) {
-            this.category = category;
-        }
-
         public double getStockAvailable() {
             return stockAvailable;
-        }
-
-        public void setStockAvailable(double stockAvailable) {
-            this.stockAvailable = stockAvailable;
         }
 
         public double getStockoutHours() {
             return stockoutHours;
         }
 
-        public void setStockoutHours(double stockoutHours) {
-            this.stockoutHours = stockoutHours;
-        }
-
         public double getSupplierDelay() {
             return supplierDelay;
         }
-
-        public void setSupplierDelay(double supplierDelay) {
-            this.supplierDelay = supplierDelay;
-        }
     }
-
-    // =========================================================
-    // MARKETING RECORD
-    // =========================================================
 
     public static class MarketingRecord {
 
-        private String date;
-        private String campaign;
-        private String category;
-
-        private double spend;
-        private double impressions;
-        private double clicks;
-        private double conversions;
-
-        public MarketingRecord() {
-        }
+        private final LocalDate date;
+        private final String campaign;
+        private final String category;
+        private final double spend;
+        private final double impressions;
+        private final double clicks;
+        private final double conversions;
 
         public MarketingRecord(
-                String date,
+                LocalDate date,
                 String campaign,
                 String category,
                 double spend,
@@ -245,60 +171,32 @@ public class MultiSourceAnalysisService {
             this.conversions = conversions;
         }
 
-        public String getDate() {
+        public LocalDate getDate() {
             return date;
-        }
-
-        public void setDate(String date) {
-            this.date = date;
         }
 
         public String getCampaign() {
             return campaign;
         }
 
-        public void setCampaign(String campaign) {
-            this.campaign = campaign;
-        }
-
         public String getCategory() {
             return category;
-        }
-
-        public void setCategory(String category) {
-            this.category = category;
         }
 
         public double getSpend() {
             return spend;
         }
 
-        public void setSpend(double spend) {
-            this.spend = spend;
-        }
-
         public double getImpressions() {
             return impressions;
-        }
-
-        public void setImpressions(double impressions) {
-            this.impressions = impressions;
         }
 
         public double getClicks() {
             return clicks;
         }
 
-        public void setClicks(double clicks) {
-            this.clicks = clicks;
-        }
-
         public double getConversions() {
             return conversions;
-        }
-
-        public void setConversions(double conversions) {
-            this.conversions = conversions;
         }
     }
 
@@ -310,116 +208,137 @@ public class MultiSourceAnalysisService {
 
         private double totalRevenue;
         private double totalQuantity;
-        private double totalStock;
+
+        /*
+         * Kept as totalInventory for frontend backward compatibility.
+         * This represents the sum of validated stock snapshot values,
+         * not a unique physical inventory balance.
+         */
+        private double totalInventory;
+
         private double totalStockoutHours;
-        private double totalMarketingSpend;
-        private double totalConversions;
+        private double marketingSpend;
+        private double marketingConversions;
 
         private String kpi;
         private String movement;
         private double movementPercentage;
 
-        // Driver movement signals
-        private Map<String, Double> driverContributions;
+        private Map<String, Double> driverMovements =
+                new LinkedHashMap<>();
 
-        // Normalized impact scores
-        private Map<String, Double> driverImpactScores;
+        private Map<String, Double> driverImpactScores =
+                new LinkedHashMap<>();
 
-        // High / Medium / Low
-        private Map<String, String> driverImpactLevels;
+        private Map<String, String> driverImpactLevels =
+                new LinkedHashMap<>();
 
         private String primaryDriver;
-        private List<String> evidence;
+
+        private List<String> evidence =
+                new ArrayList<>();
 
         private String driverExplanation;
+
+        private String persona;
+        private String personaNarrative;
+        private String personaAction;
+
         private double confidence;
+        private String confidenceLevel;
+
+        private boolean abstained;
+        private String clarificationRequest;
 
         private String analyticalMethod;
         private String recommendation;
-
         private String owner;
         private String monitoringPlan;
+
+        private boolean sparseHistory;
+        private int commonDateCount;
+        private String historyCoverage;
 
         public double getTotalRevenue() {
             return totalRevenue;
         }
 
-        public void setTotalRevenue(double totalRevenue) {
-            this.totalRevenue = totalRevenue;
+        public void setTotalRevenue(double value) {
+            this.totalRevenue = value;
         }
 
         public double getTotalQuantity() {
             return totalQuantity;
         }
 
-        public void setTotalQuantity(double totalQuantity) {
-            this.totalQuantity = totalQuantity;
+        public void setTotalQuantity(double value) {
+            this.totalQuantity = value;
         }
 
-        public double getTotalStock() {
-            return totalStock;
+        public double getTotalInventory() {
+            return totalInventory;
         }
 
-        public void setTotalStock(double totalStock) {
-            this.totalStock = totalStock;
+        public void setTotalInventory(double value) {
+            this.totalInventory = value;
         }
 
         public double getTotalStockoutHours() {
             return totalStockoutHours;
         }
 
-        public void setTotalStockoutHours(double totalStockoutHours) {
-            this.totalStockoutHours = totalStockoutHours;
+        public void setTotalStockoutHours(double value) {
+            this.totalStockoutHours = value;
         }
 
-        public double getTotalMarketingSpend() {
-            return totalMarketingSpend;
+        public double getMarketingSpend() {
+            return marketingSpend;
         }
 
-        public void setTotalMarketingSpend(double totalMarketingSpend) {
-            this.totalMarketingSpend = totalMarketingSpend;
+        public void setMarketingSpend(double value) {
+            this.marketingSpend = value;
         }
 
-        public double getTotalConversions() {
-            return totalConversions;
+        public double getMarketingConversions() {
+            return marketingConversions;
         }
 
-        public void setTotalConversions(double totalConversions) {
-            this.totalConversions = totalConversions;
+        public void setMarketingConversions(double value) {
+            this.marketingConversions = value;
         }
 
         public String getKpi() {
             return kpi;
         }
 
-        public void setKpi(String kpi) {
-            this.kpi = kpi;
+        public void setKpi(String value) {
+            this.kpi = value;
         }
 
         public String getMovement() {
             return movement;
         }
 
-        public void setMovement(String movement) {
-            this.movement = movement;
+        public void setMovement(String value) {
+            this.movement = value;
         }
 
         public double getMovementPercentage() {
             return movementPercentage;
         }
 
-        public void setMovementPercentage(double movementPercentage) {
-            this.movementPercentage = movementPercentage;
+        public void setMovementPercentage(double value) {
+            this.movementPercentage = value;
         }
 
-        public Map<String, Double> getDriverContributions() {
-            return driverContributions;
+        public Map<String, Double> getDriverMovements() {
+            return driverMovements;
         }
 
-        public void setDriverContributions(
-                Map<String, Double> driverContributions
+        public void setDriverMovements(
+                Map<String, Double> value
         ) {
-            this.driverContributions = driverContributions;
+            this.driverMovements = value;
         }
 
         public Map<String, Double> getDriverImpactScores() {
@@ -427,9 +346,9 @@ public class MultiSourceAnalysisService {
         }
 
         public void setDriverImpactScores(
-                Map<String, Double> driverImpactScores
+                Map<String, Double> value
         ) {
-            this.driverImpactScores = driverImpactScores;
+            this.driverImpactScores = value;
         }
 
         public Map<String, String> getDriverImpactLevels() {
@@ -437,146 +356,293 @@ public class MultiSourceAnalysisService {
         }
 
         public void setDriverImpactLevels(
-                Map<String, String> driverImpactLevels
+                Map<String, String> value
         ) {
-            this.driverImpactLevels = driverImpactLevels;
+            this.driverImpactLevels = value;
         }
 
         public String getPrimaryDriver() {
             return primaryDriver;
         }
 
-        public void setPrimaryDriver(String primaryDriver) {
-            this.primaryDriver = primaryDriver;
+        public void setPrimaryDriver(String value) {
+            this.primaryDriver = value;
         }
 
         public List<String> getEvidence() {
             return evidence;
         }
 
-        public void setEvidence(List<String> evidence) {
-            this.evidence = evidence;
+        public void setEvidence(List<String> value) {
+            this.evidence = value;
         }
 
         public String getDriverExplanation() {
             return driverExplanation;
         }
 
-        public void setDriverExplanation(String driverExplanation) {
-            this.driverExplanation = driverExplanation;
+        public void setDriverExplanation(String value) {
+            this.driverExplanation = value;
+        }
+
+        public String getPersona() {
+            return persona;
+        }
+
+        public void setPersona(String value) {
+            this.persona = value;
+        }
+
+        public String getPersonaNarrative() {
+            return personaNarrative;
+        }
+
+        public void setPersonaNarrative(String value) {
+            this.personaNarrative = value;
+        }
+
+        public String getPersonaAction() {
+            return personaAction;
+        }
+
+        public void setPersonaAction(String value) {
+            this.personaAction = value;
         }
 
         public double getConfidence() {
             return confidence;
         }
 
-        public void setConfidence(double confidence) {
-            this.confidence = confidence;
+        public void setConfidence(double value) {
+            this.confidence = value;
+        }
+
+        public String getConfidenceLevel() {
+            return confidenceLevel;
+        }
+
+        public void setConfidenceLevel(String value) {
+            this.confidenceLevel = value;
+        }
+
+        public boolean isAbstained() {
+            return abstained;
+        }
+
+        public void setAbstained(boolean value) {
+            this.abstained = value;
+        }
+
+        public String getClarificationRequest() {
+            return clarificationRequest;
+        }
+
+        public void setClarificationRequest(String value) {
+            this.clarificationRequest = value;
         }
 
         public String getAnalyticalMethod() {
             return analyticalMethod;
         }
 
-        public void setAnalyticalMethod(String analyticalMethod) {
-            this.analyticalMethod = analyticalMethod;
+        public void setAnalyticalMethod(String value) {
+            this.analyticalMethod = value;
         }
 
         public String getRecommendation() {
             return recommendation;
         }
 
-        public void setRecommendation(String recommendation) {
-            this.recommendation = recommendation;
+        public void setRecommendation(String value) {
+            this.recommendation = value;
         }
 
         public String getOwner() {
             return owner;
         }
 
-        public void setOwner(String owner) {
-            this.owner = owner;
+        public void setOwner(String value) {
+            this.owner = value;
         }
 
         public String getMonitoringPlan() {
             return monitoringPlan;
         }
 
-        public void setMonitoringPlan(String monitoringPlan) {
-            this.monitoringPlan = monitoringPlan;
+        public void setMonitoringPlan(String value) {
+            this.monitoringPlan = value;
+        }
+
+        public boolean isSparseHistory() {
+            return sparseHistory;
+        }
+
+        public void setSparseHistory(boolean value) {
+            this.sparseHistory = value;
+        }
+
+        public int getCommonDateCount() {
+            return commonDateCount;
+        }
+
+        public void setCommonDateCount(int value) {
+            this.commonDateCount = value;
+        }
+
+        public String getHistoryCoverage() {
+            return historyCoverage;
+        }
+
+        public void setHistoryCoverage(String value) {
+            this.historyCoverage = value;
         }
     }
 
     // =========================================================
-    // MAIN ENTRY
+    // COLUMN TYPES
+    // =========================================================
+
+    private enum ColumnType {
+        DATE,
+        PRODUCT,
+        CATEGORY,
+        REGION,
+        QUANTITY,
+        UNIT_PRICE,
+        COST,
+        REVENUE,
+
+        STOCK_AVAILABLE,
+        STOCKOUT,
+        SUPPLIER_DELAY,
+
+        CAMPAIGN,
+        SPEND,
+        IMPRESSIONS,
+        CLICKS,
+        CONVERSIONS
+    }
+
+    private enum SourceType {
+        SALES,
+        INVENTORY,
+        MARKETING
+    }
+
+    private static class ParsedDataSet {
+
+        private final List<SalesRecord> sales;
+        private final List<InventoryRecord> inventory;
+        private final List<MarketingRecord> marketing;
+
+        ParsedDataSet(
+                List<SalesRecord> sales,
+                List<InventoryRecord> inventory,
+                List<MarketingRecord> marketing
+        ) {
+            this.sales = List.copyOf(sales);
+            this.inventory = List.copyOf(inventory);
+            this.marketing = List.copyOf(marketing);
+        }
+    }
+
+    private static class SparseHistoryAssessment {
+
+        boolean sparse;
+
+        List<String> reasons =
+                new ArrayList<>();
+    }
+
+    // =========================================================
+    // MAIN ENTRY POINT
     // =========================================================
 
     public MultiSourceAnalysisResponse analyze(
             MultipartFile salesFile,
             MultipartFile inventoryFile,
-            MultipartFile marketingFile
+            MultipartFile marketingFile,
+            String persona
     ) throws IOException {
 
         if (salesFile == null || salesFile.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Sales file is required."
+                    "Sales file is missing or empty."
             );
         }
 
         if (inventoryFile == null || inventoryFile.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Inventory file is required."
+                    "Inventory file is missing or empty."
             );
         }
 
         if (marketingFile == null || marketingFile.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Marketing file is required."
+                    "Marketing file is missing or empty."
             );
         }
 
-        List<SalesRecord> salesRecords =
-                readSalesFile(salesFile);
+        List<SalesRecord> sales =
+                validateSalesRecords(
+                        readSalesFile(salesFile)
+                );
 
-        List<InventoryRecord> inventoryRecords =
-                readInventoryFile(inventoryFile);
+        List<InventoryRecord> inventory =
+                validateInventoryRecords(
+                        readInventoryFile(inventoryFile)
+                );
 
-        List<MarketingRecord> marketingRecords =
-                readMarketingFile(marketingFile);
+        List<MarketingRecord> marketing =
+                validateMarketingRecords(
+                        readMarketingFile(marketingFile)
+                );
 
-        if (salesRecords.isEmpty()) {
+        if (sales.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Sales file contains no valid records."
+                    "No valid Sales records found."
             );
         }
 
-        if (inventoryRecords.isEmpty()) {
+        if (inventory.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Inventory file contains no valid records."
+                    "No valid Inventory records found."
             );
         }
 
-        if (marketingRecords.isEmpty()) {
+        if (marketing.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Marketing file contains no valid records."
+                    "No valid Marketing records found."
             );
         }
+
+        ParsedDataSet validatedData =
+                new ParsedDataSet(
+                        sales,
+                        inventory,
+                        marketing
+                );
 
         return buildAnalysis(
-                salesRecords,
-                inventoryRecords,
-                marketingRecords
+                validatedData.sales,
+                validatedData.inventory,
+                validatedData.marketing,
+                safeText(
+                        persona,
+                        "Supply Chain Manager"
+                )
         );
     }
 
     // =========================================================
-    // MAIN ANALYSIS
+    // ANALYSIS
     // =========================================================
 
     private MultiSourceAnalysisResponse buildAnalysis(
             List<SalesRecord> sales,
             List<InventoryRecord> inventory,
-            List<MarketingRecord> marketing
+            List<MarketingRecord> marketing,
+            String persona
     ) {
 
         MultiSourceAnalysisResponse response =
@@ -592,16 +658,16 @@ public class MultiSourceAnalysisService {
         double totalQuantity =
                 sumSalesQuantity(sales);
 
-        double totalStock =
+        double totalInventory =
                 sumInventoryStock(inventory);
 
         double totalStockoutHours =
-                sumInventoryStockout(inventory);
+                sumStockoutHours(inventory);
 
-        double totalMarketingSpend =
+        double marketingSpend =
                 sumMarketingSpend(marketing);
 
-        double totalConversions =
+        double marketingConversions =
                 sumMarketingConversions(marketing);
 
         response.setTotalRevenue(
@@ -612,212 +678,260 @@ public class MultiSourceAnalysisService {
                 round(totalQuantity)
         );
 
-        response.setTotalStock(
-                round(totalStock)
+        response.setTotalInventory(
+                round(totalInventory)
         );
 
         response.setTotalStockoutHours(
                 round(totalStockoutHours)
         );
 
-        response.setTotalMarketingSpend(
-                round(totalMarketingSpend)
+        response.setMarketingSpend(
+                round(marketingSpend)
         );
 
-        response.setTotalConversions(
-                round(totalConversions)
+        /*
+         * IMPORTANT:
+         * This is calculated directly from the validated
+         * MarketingRecord list.
+         */
+        response.setMarketingConversions(
+                round(marketingConversions)
         );
 
         // =====================================================
-        // COMMON DATE RANGE
+        // SOURCE DATE SETS
         // =====================================================
 
-        Set<LocalDate> allDates =
-                new TreeSet<>();
+        Set<LocalDate> salesDates =
+                getDistinctDatesFromSales(sales);
 
-        addSalesDates(
-                allDates,
-                sales
+        Set<LocalDate> inventoryDates =
+                getDistinctDatesFromInventory(inventory);
+
+        Set<LocalDate> marketingDates =
+                getDistinctDatesFromMarketing(marketing);
+
+        Set<LocalDate> commonDates =
+                new TreeSet<>(salesDates);
+
+        commonDates.retainAll(inventoryDates);
+        commonDates.retainAll(marketingDates);
+
+        response.setCommonDateCount(
+                commonDates.size()
         );
 
-        addInventoryDates(
-                allDates,
-                inventory
-        );
+        // =====================================================
+        // SPARSE HISTORY
+        // =====================================================
 
-        addMarketingDates(
-                allDates,
-                marketing
-        );
-
-        if (allDates.size() < 2) {
-
-            throw new IllegalArgumentException(
-                    "At least two distinct dates across Sales, Inventory and Marketing are required."
-            );
-        }
-
-        List<LocalDate> sortedDates =
-                new ArrayList<>(allDates);
-
-        LocalDate firstDate =
-                sortedDates.get(0);
-
-        LocalDate lastDate =
-                sortedDates.get(
-                        sortedDates.size() - 1
+        SparseHistoryAssessment sparse =
+                assessSparseHistory(
+                        sales,
+                        inventory,
+                        marketing,
+                        commonDates
                 );
+
+        response.setSparseHistory(
+                sparse.sparse
+        );
+
+        // =====================================================
+        // NOT ENOUGH COMMON HISTORY
+        // =====================================================
+
+        if (commonDates.size() < 2) {
+
+            response.setKpi("Revenue");
+            response.setMovement("Insufficient Data");
+            response.setMovementPercentage(0.0);
+
+            response.setPrimaryDriver(
+                    "Insufficient aligned history"
+            );
+
+            response.setDriverExplanation(
+                    "Sales, Inventory and Marketing data do not have enough "
+                            + "common dates to calculate a reliable before-versus-after KPI movement."
+            );
+
+            response.setEvidence(
+                    buildInsufficientHistoryEvidence(
+                            sales,
+                            inventory,
+                            marketing,
+                            commonDates,
+                            sparse
+                    )
+            );
+
+            response.setConfidence(0.0);
+            response.setConfidenceLevel("Low");
+            response.setAbstained(true);
+
+            response.setClarificationRequest(
+                    buildClarificationRequest(sparse)
+            );
+
+            response.setRecommendation(
+                    "Do not automate a business decision until aligned historical data is available."
+            );
+
+            response.setOwner("Business Analyst");
+
+            response.setMonitoringPlan(
+                    "Validate source freshness, date alignment, KPI definitions and record completeness."
+            );
+
+            response.setAnalyticalMethod(
+                    buildAnalyticalMethod()
+            );
+
+            applyPersonaInsight(
+                    response,
+                    persona,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+            );
+
+            return response;
+        }
 
         // =====================================================
         // PERIOD SPLIT
         // =====================================================
 
-        int splitIndex =
-                sortedDates.size() / 2;
+        List<LocalDate> sortedDates =
+                new ArrayList<>(commonDates);
 
-        LocalDate recentStartDate =
-                sortedDates.get(splitIndex);
+        sortedDates.sort(
+                Comparator.naturalOrder()
+        );
+
+        /*
+         * Use aligned observation dates rather than a raw calendar
+         * midpoint. This gives a deterministic before/after split
+         * even when source cadence contains gaps.
+         *
+         * Example:
+         * 15 common dates -> 8 baseline + 7 recent
+         */
+        int splitIndex =
+                Math.max(
+                        1,
+                        sortedDates.size() / 2
+                );
+
+        if (splitIndex >= sortedDates.size()) {
+            splitIndex =
+                    sortedDates.size() - 1;
+        }
+
+        Set<LocalDate> baselineDates =
+                new TreeSet<>(
+                        sortedDates.subList(
+                                0,
+                                splitIndex
+                        )
+                );
+
+        Set<LocalDate> recentDates =
+                new TreeSet<>(
+                        sortedDates.subList(
+                                splitIndex,
+                                sortedDates.size()
+                        )
+                );
+
+        LocalDate baselineStartDate =
+                baselineDates.iterator().next();
 
         LocalDate baselineEndDate =
-                recentStartDate.minusDays(1);
+                ((TreeSet<LocalDate>) baselineDates).last();
+
+        LocalDate recentStartDate =
+                recentDates.iterator().next();
+
+        LocalDate recentEndDate =
+                ((TreeSet<LocalDate>) recentDates).last();
 
         // =====================================================
-        // SALES PERIODS
+        // PERIOD RECORDS
         // =====================================================
 
         List<SalesRecord> baselineSales =
-                sales.stream()
-                        .filter(record ->
-                                isBefore(
-                                        record.getDate(),
-                                        recentStartDate
-                                )
-                        )
-                        .toList();
+                filterSalesByDates(
+                        sales,
+                        baselineDates
+                );
 
         List<SalesRecord> recentSales =
-                sales.stream()
-                        .filter(record ->
-                                isOnOrAfter(
-                                        record.getDate(),
-                                        recentStartDate
-                                )
-                        )
-                        .toList();
-
-        // =====================================================
-        // INVENTORY PERIODS
-        // =====================================================
+                filterSalesByDates(
+                        sales,
+                        recentDates
+                );
 
         List<InventoryRecord> baselineInventory =
-                inventory.stream()
-                        .filter(record ->
-                                isBefore(
-                                        record.getDate(),
-                                        recentStartDate
-                                )
-                        )
-                        .toList();
+                filterInventoryByDates(
+                        inventory,
+                        baselineDates
+                );
 
         List<InventoryRecord> recentInventory =
-                inventory.stream()
-                        .filter(record ->
-                                isOnOrAfter(
-                                        record.getDate(),
-                                        recentStartDate
-                                )
-                        )
-                        .toList();
-
-        // =====================================================
-        // MARKETING PERIODS
-        // =====================================================
+                filterInventoryByDates(
+                        inventory,
+                        recentDates
+                );
 
         List<MarketingRecord> baselineMarketing =
-                marketing.stream()
-                        .filter(record ->
-                                isBefore(
-                                        record.getDate(),
-                                        recentStartDate
-                                )
-                        )
-                        .toList();
+                filterMarketingByDates(
+                        marketing,
+                        baselineDates
+                );
 
         List<MarketingRecord> recentMarketing =
-                marketing.stream()
-                        .filter(record ->
-                                isOnOrAfter(
-                                        record.getDate(),
-                                        recentStartDate
-                                )
-                        )
-                        .toList();
+                filterMarketingByDates(
+                        marketing,
+                        recentDates
+                );
 
         // =====================================================
-        // SAFETY CHECK
-        // =====================================================
-
-        if (
-                baselineSales.isEmpty()
-                        || recentSales.isEmpty()
-        ) {
-
-            throw new IllegalArgumentException(
-                    "Sales data must contain records in both baseline and recent periods."
-            );
-        }
-
-        // =====================================================
-        // PERIOD KPI VALUES
+        // PERIOD AGGREGATION
         // =====================================================
 
         double baselineRevenue =
-                sumSalesRevenue(
-                        baselineSales
-                );
+                sumSalesRevenue(baselineSales);
 
         double recentRevenue =
-                sumSalesRevenue(
-                        recentSales
-                );
+                sumSalesRevenue(recentSales);
 
         double baselineQuantity =
-                sumSalesQuantity(
-                        baselineSales
-                );
+                sumSalesQuantity(baselineSales);
 
         double recentQuantity =
-                sumSalesQuantity(
-                        recentSales
-                );
+                sumSalesQuantity(recentSales);
 
-        double baselineAveragePrice =
-                baselineQuantity == 0
-                        ? 0
-                        : baselineRevenue / baselineQuantity;
-
-        double recentAveragePrice =
-                recentQuantity == 0
-                        ? 0
-                        : recentRevenue / recentQuantity;
-
-        double baselineStock =
+        double baselineInventoryValue =
                 sumInventoryStock(
                         baselineInventory
                 );
 
-        double recentStock =
+        double recentInventoryValue =
                 sumInventoryStock(
                         recentInventory
                 );
 
         double baselineStockout =
-                sumInventoryStockout(
+                sumStockoutHours(
                         baselineInventory
                 );
 
         double recentStockout =
-                sumInventoryStockout(
+                sumStockoutHours(
                         recentInventory
                 );
 
@@ -831,8 +945,18 @@ public class MultiSourceAnalysisService {
                         recentMarketing
                 );
 
+        double baselineSpend =
+                sumMarketingSpend(
+                        baselineMarketing
+                );
+
+        double recentSpend =
+                sumMarketingSpend(
+                        recentMarketing
+                );
+
         // =====================================================
-        // KPI MOVEMENTS
+        // MOVEMENTS
         // =====================================================
 
         double revenueChange =
@@ -847,21 +971,11 @@ public class MultiSourceAnalysisService {
                         recentQuantity
                 );
 
-        double priceChange =
+        double inventoryChange =
                 percentageChange(
-                        baselineAveragePrice,
-                        recentAveragePrice
+                        baselineInventoryValue,
+                        recentInventoryValue
                 );
-
-        double stockChange =
-                percentageChange(
-                        baselineStock,
-                        recentStock
-                );
-
-        double stockoutDelta =
-                recentStockout -
-                        baselineStockout;
 
         double conversionChange =
                 percentageChange(
@@ -869,18 +983,34 @@ public class MultiSourceAnalysisService {
                         recentConversions
                 );
 
+        double priceChange =
+                percentageChange(
+                        averageSellingPrice(
+                                baselineSales
+                        ),
+                        averageSellingPrice(
+                                recentSales
+                        )
+                );
+
+        double stockoutDelta =
+                percentageChange(
+                        baselineStockout,
+                        recentStockout
+                );
+
         // =====================================================
-        // KPI RESPONSE
+        // KPI MOVEMENT
         // =====================================================
 
-        response.setKpi(
-                "Revenue"
-        );
+        response.setKpi("Revenue");
 
         response.setMovement(
-                revenueChange < 0
-                        ? "↓ Revenue"
-                        : "↑ Revenue"
+                revenueChange > 2
+                        ? "↑ Revenue Growth"
+                        : revenueChange < -2
+                        ? "↓ Revenue Decline"
+                        : "→ Revenue Stable"
         );
 
         response.setMovementPercentage(
@@ -888,55 +1018,11 @@ public class MultiSourceAnalysisService {
         );
 
         // =====================================================
-        // REVENUE DECOMPOSITION
-        // =====================================================
-
-        double volumeEffect =
-                (
-                        recentQuantity
-                                - baselineQuantity
-                )
-                        * baselineAveragePrice;
-
-        double priceEffect =
-                recentQuantity
-                        * (
-                        recentAveragePrice
-                                - baselineAveragePrice
-                );
-
-        double volumeContribution =
-                baselineRevenue == 0
-                        ? 0
-                        : (
-                        volumeEffect
-                                / baselineRevenue
-                ) * 100.0;
-
-        double priceContribution =
-                baselineRevenue == 0
-                        ? 0
-                        : (
-                        priceEffect
-                                / baselineRevenue
-                ) * 100.0;
-
-        // =====================================================
-        // DRIVER MOVEMENT + IMPACT SCORING
+        // DRIVER MOVEMENTS
         // =====================================================
 
         Map<String, Double> drivers =
                 new LinkedHashMap<>();
-
-        Map<String, Double> impactScores =
-                new LinkedHashMap<>();
-
-        Map<String, String> impactLevels =
-                new LinkedHashMap<>();
-
-        // -----------------------------------------------------
-        // Driver movement signals
-        // -----------------------------------------------------
 
         drivers.put(
                 "Sales Volume",
@@ -950,7 +1036,7 @@ public class MultiSourceAnalysisService {
 
         drivers.put(
                 "Inventory Availability",
-                round(stockChange)
+                round(inventoryChange)
         );
 
         drivers.put(
@@ -963,89 +1049,81 @@ public class MultiSourceAnalysisService {
                 round(conversionChange)
         );
 
-        // -----------------------------------------------------
-        // Impact scores
-        // -----------------------------------------------------
+        response.setDriverMovements(
+                drivers
+        );
 
-        double salesVolumeImpact =
-                calculateImpactScore(
-                        quantityChange,
-                        false
-                );
+        // =====================================================
+        // DRIVER IMPACT
+        // =====================================================
 
-        double priceImpact =
-                calculateImpactScore(
-                        priceChange,
-                        false
-                );
-
-        double inventoryImpact =
-                calculateImpactScore(
-                        stockChange,
-                        false
-                );
-
-        double stockoutImpact =
-                calculateImpactScore(
-                        stockoutDelta,
-                        true
-                );
-
-        double marketingImpact =
-                calculateImpactScore(
-                        conversionChange,
-                        false
-                );
+        Map<String, Double> impactScores =
+                new LinkedHashMap<>();
 
         impactScores.put(
                 "Sales Volume",
-                salesVolumeImpact
+                calculateImpactScore(
+                        quantityChange,
+                        false
+                )
         );
 
         impactScores.put(
                 "Average Price",
-                priceImpact
+                calculateImpactScore(
+                        priceChange,
+                        false
+                )
         );
 
         impactScores.put(
                 "Inventory Availability",
-                inventoryImpact
+                calculateImpactScore(
+                        inventoryChange,
+                        false
+                )
         );
 
         impactScores.put(
                 "Stockout Hours",
-                stockoutImpact
+                calculateImpactScore(
+                        stockoutDelta,
+                        true
+                )
         );
 
         impactScores.put(
                 "Marketing Conversions",
-                marketingImpact
+                calculateImpactScore(
+                        conversionChange,
+                        false
+                )
         );
 
-        // -----------------------------------------------------
-        // Impact levels
-        // -----------------------------------------------------
+        Map<String, Double> sortedImpact =
+                sortByValueDescending(
+                        impactScores
+                );
+
+        response.setDriverImpactScores(
+                sortedImpact
+        );
+
+        Map<String, String> impactLevels =
+                new LinkedHashMap<>();
 
         for (
-                Map.Entry<String, Double> entry :
-                impactScores.entrySet()
+                Map.Entry<String, Double> entry
+                        : sortedImpact.entrySet()
         ) {
 
             impactLevels.put(
                     entry.getKey(),
-                    getImpactLevel(
+                    impactLevel(
                             entry.getValue()
                     )
             );
         }
-
-        response.setDriverContributions(
-                drivers
-        );
-
-        response.setDriverImpactScores(
-                impactScores
-        );
 
         response.setDriverImpactLevels(
                 impactLevels
@@ -1055,154 +1133,37 @@ public class MultiSourceAnalysisService {
         // PRIMARY DRIVER
         // =====================================================
 
-        String primaryDriver;
-
-        if (
-                quantityChange <= -20
-                        && stockChange <= -15
-                        && stockoutDelta > 0
-        ) {
-
-            primaryDriver =
-                    "Sales Volume constrained by Inventory Availability";
-
-        } else if (
-                quantityChange <= -15
-                        && conversionChange <= -20
-        ) {
-
-            primaryDriver =
-                    "Sales Volume + Marketing Conversion Decline";
-
-        } else if (
-                stockChange <= -15
-                        && stockoutDelta > 0
-        ) {
-
-            primaryDriver =
-                    "Inventory Availability + Stockout Risk";
-
-        } else if (
-                quantityChange <= -10
-        ) {
-
-            primaryDriver =
-                    "Sales Volume";
-
-        } else if (
-                priceChange <= -10
-        ) {
-
-            primaryDriver =
-                    "Average Price";
-
-        } else if (
-                conversionChange <= -15
-        ) {
-
-            primaryDriver =
-                    "Marketing Conversions";
-
-        } else {
-
-            primaryDriver =
-                    "Multiple interacting drivers";
-        }
+        String primaryDriver =
+                sortedImpact.entrySet()
+                        .stream()
+                        .filter(
+                                entry ->
+                                        entry.getValue() > 0
+                        )
+                        .findFirst()
+                        .map(Map.Entry::getKey)
+                        .orElse(
+                                "Insufficient evidence"
+                        );
 
         response.setPrimaryDriver(
                 primaryDriver
         );
 
         // =====================================================
-        // TRACEABLE EXPLANATION
+        // DRIVER EXPLANATION
         // =====================================================
 
-        StringBuilder explanation =
-                new StringBuilder();
-
-        explanation.append(
-                "Revenue changed from ₹"
-                        + formatNumber(
-                        baselineRevenue
-                )
-                        + " to ₹"
-                        + formatNumber(
-                        recentRevenue
-                )
-                        + " ("
-                        + formatPercent(
-                        revenueChange
-                )
-                        + "). "
-        );
-
-        explanation.append(
-                "Sales quantity changed from "
-                        + formatNumber(
-                        baselineQuantity
-                )
-                        + " to "
-                        + formatNumber(
-                        recentQuantity
-                )
-                        + " ("
-                        + formatPercent(
-                        quantityChange
-                )
-                        + "). "
-        );
-
-        explanation.append(
-                "Average selling price changed from ₹"
-                        + formatNumber(
-                        baselineAveragePrice
-                )
-                        + " to ₹"
-                        + formatNumber(
-                        recentAveragePrice
-                )
-                        + " ("
-                        + formatPercent(
-                        priceChange
-                )
-                        + "). "
-        );
-
-        if (stockChange < 0) {
-
-            explanation.append(
-                    "Inventory availability declined by "
-                            + formatPercent(
-                            stockChange
-                    )
-                            + ". "
-            );
-        }
-
-        if (stockoutDelta > 0) {
-
-            explanation.append(
-                    "Stockout exposure increased by "
-                            + formatNumber(
-                            stockoutDelta
-                    )
-                            + " hours. "
-            );
-        }
-
-        if (conversionChange < 0) {
-
-            explanation.append(
-                    "Marketing conversions declined by "
-                            + formatPercent(
-                            conversionChange
-                    )
-                            + ". "
-            );
-        }
-
         response.setDriverExplanation(
-                explanation.toString().trim()
+                buildDriverExplanation(
+                        primaryDriver,
+                        revenueChange,
+                        quantityChange,
+                        priceChange,
+                        inventoryChange,
+                        stockoutDelta,
+                        conversionChange
+                )
         );
 
         // =====================================================
@@ -1214,139 +1175,121 @@ public class MultiSourceAnalysisService {
 
         evidence.add(
                 "Baseline period: "
-                        + firstDate
+                        + baselineStartDate
                         + " to "
                         + baselineEndDate
-                        + "."
         );
 
         evidence.add(
                 "Recent period: "
                         + recentStartDate
                         + " to "
-                        + lastDate
-                        + "."
+                        + recentEndDate
         );
 
         evidence.add(
-                "Revenue changed from ₹"
-                        + formatNumber(
-                        baselineRevenue
-                )
-                        + " to ₹"
-                        + formatNumber(
-                        recentRevenue
-                )
-                        + " ("
-                        + formatPercent(
-                        revenueChange
-                )
-                        + ")."
+                "Common-date aligned observations: "
+                        + commonDates.size()
         );
 
         evidence.add(
-                "Quantity changed from "
-                        + formatNumber(
-                        baselineQuantity
-                )
-                        + " to "
-                        + formatNumber(
-                        recentQuantity
-                )
-                        + " ("
-                        + formatPercent(
-                        quantityChange
-                )
-                        + ")."
+                "Baseline aligned dates: "
+                        + baselineDates.size()
+                        + " | Recent aligned dates: "
+                        + recentDates.size()
         );
 
         evidence.add(
-                "Average price changed from ₹"
-                        + formatNumber(
-                        baselineAveragePrice
+                buildHistoryCoverage(
+                        sales,
+                        inventory,
+                        marketing,
+                        baselineSales,
+                        recentSales,
+                        baselineInventory,
+                        recentInventory,
+                        baselineMarketing,
+                        recentMarketing
                 )
-                        + " to ₹"
-                        + formatNumber(
-                        recentAveragePrice
-                )
-                        + " ("
-                        + formatPercent(
-                        priceChange
-                )
-                        + ")."
+        );
+
+        // Explicit aggregate evidence
+        evidence.add(
+                "Marketing conversions: total="
+                        + round(marketingConversions)
+                        + " | baseline="
+                        + round(baselineConversions)
+                        + " | recent="
+                        + round(recentConversions)
         );
 
         evidence.add(
-                "Inventory changed from "
-                        + formatNumber(
-                        baselineStock
-                )
-                        + " to "
-                        + formatNumber(
-                        recentStock
-                )
-                        + " ("
-                        + formatPercent(
-                        stockChange
-                )
-                        + ")."
+                "Marketing spend: total="
+                        + round(marketingSpend)
+                        + " | baseline="
+                        + round(baselineSpend)
+                        + " | recent="
+                        + round(recentSpend)
         );
 
         evidence.add(
-                "Stockout exposure changed from "
-                        + formatNumber(
-                        baselineStockout
-                )
-                        + " to "
-                        + formatNumber(
-                        recentStockout
-                )
-                        + " hours."
+                "Inventory stock snapshot sum: total="
+                        + round(totalInventory)
+                        + " | baseline="
+                        + round(baselineInventoryValue)
+                        + " | recent="
+                        + round(recentInventoryValue)
         );
 
-        evidence.add(
-                "Marketing conversions changed from "
-                        + formatNumber(
-                        baselineConversions
-                )
-                        + " to "
-                        + formatNumber(
-                        recentConversions
-                )
-                        + " ("
-                        + formatPercent(
-                        conversionChange
-                )
-                        + ")."
-        );
-
-        // =====================================================
-        // PRODUCT EVIDENCE
-        // =====================================================
-
-        addTopProductEvidence(
+        addLargestRevenueDeclineEvidence(
                 evidence,
                 baselineSales,
                 recentSales
         );
 
-        // =====================================================
-        // INVENTORY EVIDENCE
-        // =====================================================
-
-        addInventoryEvidence(
+        addHighestStockoutEvidence(
                 evidence,
                 recentInventory
         );
 
-        // =====================================================
-        // MARKETING EVIDENCE
-        // =====================================================
+        addMaximumSupplierDelayEvidence(
+                evidence,
+                recentInventory
+        );
 
-        addMarketingEvidence(
+        addHighestCampaignConversionEvidence(
                 evidence,
                 recentMarketing
         );
+
+        double recentMarketingEfficiency =
+                recentSpend == 0.0
+                        ? 0.0
+                        : recentConversions / recentSpend;
+
+        evidence.add(
+                "Recent marketing conversion efficiency: "
+                        + round(recentMarketingEfficiency)
+                        + " conversions/currency unit"
+        );
+
+        if (sparse.sparse) {
+
+            evidence.add(
+                    "History sufficiency check failed: "
+                            + String.join(
+                                    "; ",
+                                    sparse.reasons
+                            )
+            );
+
+        } else {
+
+            evidence.add(
+                    "History sufficiency check passed: "
+                            + "aligned history meets the minimum threshold."
+            );
+        }
 
         response.setEvidence(
                 evidence
@@ -1361,53 +1304,134 @@ public class MultiSourceAnalysisService {
                         sales,
                         inventory,
                         marketing,
+                        commonDates.size(),
+                        baselineSales.size(),
+                        recentSales.size(),
+                        baselineInventory.size(),
+                        recentInventory.size(),
+                        baselineMarketing.size(),
+                        recentMarketing.size(),
                         quantityChange,
-                        stockChange,
+                        inventoryChange,
                         stockoutDelta,
-                        conversionChange
+                        conversionChange,
+                        revenueChange,
+                        sparse
                 );
 
         response.setConfidence(
-                round(confidence)
+                round(confidence * 100.0)
+        );
+
+        response.setConfidenceLevel(
+                confidence >= 0.75
+                        ? "High"
+                        : confidence >= 0.60
+                        ? "Medium"
+                        : "Low"
         );
 
         // =====================================================
-        // METHOD
+        // ABSTENTION
+        // =====================================================
+
+        boolean abstain =
+                sparse.sparse
+                        || confidence < ABSTENTION_THRESHOLD
+                        || "Insufficient evidence".equals(
+                        primaryDriver
+                );
+
+        response.setAbstained(
+                abstain
+        );
+
+        if (abstain) {
+
+            response.setClarificationRequest(
+                    buildClarificationRequest(
+                            sparse
+                    )
+            );
+
+            response.setRecommendation(
+                    "Do not automate a business decision yet. "
+                            + "Request clarification or additional aligned historical data."
+            );
+
+            response.setOwner(
+                    "Business Analyst"
+            );
+
+            response.setMonitoringPlan(
+                    "Monitor source completeness, freshness, date alignment, "
+                            + "KPI definition and history depth."
+            );
+
+        } else {
+
+            response.setClarificationRequest(
+                    null
+            );
+
+            response.setRecommendation(
+                    buildRecommendation(
+                            primaryDriver,
+                            revenueChange,
+                            quantityChange,
+                            inventoryChange,
+                            stockoutDelta,
+                            conversionChange
+                    )
+            );
+
+            response.setOwner(
+                    persona
+            );
+
+            response.setMonitoringPlan(
+                    buildMonitoringPlan(
+                            primaryDriver
+                    )
+            );
+        }
+
+        // =====================================================
+        // PERSONA
+        // =====================================================
+
+        applyPersonaInsight(
+                response,
+                persona,
+                revenueChange,
+                inventoryChange,
+                stockoutDelta,
+                conversionChange
+        );
+
+        // =====================================================
+        // ANALYTICAL METHOD
         // =====================================================
 
         response.setAnalyticalMethod(
-                "Common-date-aligned deterministic revenue "
-                        + "decomposition + cross-source movement "
-                        + "analysis + impact scoring + traceable evidence"
+                buildAnalyticalMethod()
         );
 
         // =====================================================
-        // RECOMMENDATION
+        // HISTORY COVERAGE
         // =====================================================
 
-        response.setRecommendation(
-                buildRecommendation(
-                        primaryDriver
-                )
-        );
-
-        // =====================================================
-        // OWNER
-        // =====================================================
-
-        response.setOwner(
-                determineOwner(
-                        primaryDriver
-                )
-        );
-
-        // =====================================================
-        // MONITORING
-        // =====================================================
-
-        response.setMonitoringPlan(
-                buildMonitoringPlan(
-                        primaryDriver
+        response.setHistoryCoverage(
+                buildHistoryCoverage(
+                        sales,
+                        inventory,
+                        marketing,
+                        baselineSales,
+                        recentSales,
+                        baselineInventory,
+                        recentInventory,
+                        baselineMarketing,
+                        recentMarketing
                 )
         );
 
@@ -1415,88 +1439,272 @@ public class MultiSourceAnalysisService {
     }
 
     // =========================================================
-    // DATE COLLECTION
+    // SPARSE HISTORY
     // =========================================================
 
-    private void addSalesDates(
-            Set<LocalDate> dates,
-            List<SalesRecord> records
+    private SparseHistoryAssessment assessSparseHistory(
+            List<SalesRecord> sales,
+            List<InventoryRecord> inventory,
+            List<MarketingRecord> marketing,
+            Set<LocalDate> commonDates
     ) {
 
-        for (SalesRecord record : records) {
+        SparseHistoryAssessment result =
+                new SparseHistoryAssessment();
 
-            if (
-                    record.getDate() != null
-                            && !record.getDate().isBlank()
-            ) {
+        if (commonDates.size() < MIN_COMMON_DATES) {
 
-                dates.add(
-                        parseDate(
-                                record.getDate()
-                        )
-                );
-            }
+            result.sparse = true;
+
+            result.reasons.add(
+                    "Only "
+                            + commonDates.size()
+                            + " common dates available; minimum required is "
+                            + MIN_COMMON_DATES
+            );
         }
-    }
 
-    private void addInventoryDates(
-            Set<LocalDate> dates,
-            List<InventoryRecord> records
-    ) {
+        if (sales.size() < MIN_SOURCE_RECORDS) {
 
-        for (InventoryRecord record : records) {
+            result.sparse = true;
 
-            if (
-                    record.getDate() != null
-                            && !record.getDate().isBlank()
-            ) {
-
-                dates.add(
-                        parseDate(
-                                record.getDate()
-                        )
-                );
-            }
+            result.reasons.add(
+                    "Sales has only "
+                            + sales.size()
+                            + " valid records"
+            );
         }
-    }
 
-    private void addMarketingDates(
-            Set<LocalDate> dates,
-            List<MarketingRecord> records
-    ) {
+        if (inventory.size() < MIN_SOURCE_RECORDS) {
 
-        for (MarketingRecord record : records) {
+            result.sparse = true;
 
-            if (
-                    record.getDate() != null
-                            && !record.getDate().isBlank()
-            ) {
-
-                dates.add(
-                        parseDate(
-                                record.getDate()
-                        )
-                );
-            }
+            result.reasons.add(
+                    "Inventory has only "
+                            + inventory.size()
+                            + " valid records"
+            );
         }
+
+        if (marketing.size() < MIN_SOURCE_RECORDS) {
+
+            result.sparse = true;
+
+            result.reasons.add(
+                    "Marketing has only "
+                            + marketing.size()
+                            + " valid records"
+            );
+        }
+
+        long salesDateCount =
+                sales.stream()
+                        .map(SalesRecord::getDate)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .count();
+
+        long inventoryDateCount =
+                inventory.stream()
+                        .map(InventoryRecord::getDate)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .count();
+
+        long marketingDateCount =
+                marketing.stream()
+                        .map(MarketingRecord::getDate)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .count();
+
+        if (salesDateCount < MIN_SOURCE_DATES) {
+
+            result.sparse = true;
+
+            result.reasons.add(
+                    "Sales has fewer than "
+                            + MIN_SOURCE_DATES
+                            + " distinct dates"
+            );
+        }
+
+        if (inventoryDateCount < MIN_SOURCE_DATES) {
+
+            result.sparse = true;
+
+            result.reasons.add(
+                    "Inventory has fewer than "
+                            + MIN_SOURCE_DATES
+                            + " distinct dates"
+            );
+        }
+
+        if (marketingDateCount < MIN_SOURCE_DATES) {
+
+            result.sparse = true;
+
+            result.reasons.add(
+                    "Marketing has fewer than "
+                            + MIN_SOURCE_DATES
+                            + " distinct dates"
+            );
+        }
+
+        return result;
     }
 
-    private boolean isBefore(
-            String date,
-            LocalDate comparisonDate
+    // =========================================================
+    // HISTORY COVERAGE
+    // =========================================================
+
+    private String buildHistoryCoverage(
+            List<SalesRecord> sales,
+            List<InventoryRecord> inventory,
+            List<MarketingRecord> marketing,
+            List<SalesRecord> baselineSales,
+            List<SalesRecord> recentSales,
+            List<InventoryRecord> baselineInventory,
+            List<InventoryRecord> recentInventory,
+            List<MarketingRecord> baselineMarketing,
+            List<MarketingRecord> recentMarketing
     ) {
 
-        return parseDate(date)
-                .isBefore(comparisonDate);
+        Set<LocalDate> salesDates =
+                getDistinctDatesFromSales(
+                        sales
+                );
+
+        Set<LocalDate> inventoryDates =
+                getDistinctDatesFromInventory(
+                        inventory
+                );
+
+        Set<LocalDate> marketingDates =
+                getDistinctDatesFromMarketing(
+                        marketing
+                );
+
+        Set<LocalDate> commonDateSet =
+                new TreeSet<>(salesDates);
+
+        commonDateSet.retainAll(
+                inventoryDates
+        );
+
+        commonDateSet.retainAll(
+                marketingDates
+        );
+
+        return "History coverage: "
+                + "Common aligned dates="
+                + commonDateSet.size()
+                + " | Sales records="
+                + sales.size()
+                + " | Inventory records="
+                + inventory.size()
+                + " | Marketing records="
+                + marketing.size()
+                + " | Sales dates="
+                + salesDates.size()
+                + " | Inventory dates="
+                + inventoryDates.size()
+                + " | Marketing dates="
+                + marketingDates.size()
+                + " | Baseline="
+                + baselineSales.size()
+                + "/"
+                + baselineInventory.size()
+                + "/"
+                + baselineMarketing.size()
+                + " | Recent="
+                + recentSales.size()
+                + "/"
+                + recentInventory.size()
+                + "/"
+                + recentMarketing.size()
+                + ".";
     }
 
-    private boolean isOnOrAfter(
-            String date,
-            LocalDate comparisonDate
+    // =========================================================
+    // PERSONA INSIGHTS
+    // =========================================================
+
+    private void applyPersonaInsight(
+            MultiSourceAnalysisResponse response,
+            String persona,
+            double revenueChange,
+            double inventoryChange,
+            double stockoutDelta,
+            double conversionChange
     ) {
 
-        return !parseDate(date)
-                .isBefore(comparisonDate);
+        String normalized =
+                safeText(
+                        persona,
+                        "Supply Chain Manager"
+                );
+
+        response.setPersona(
+                normalized
+        );
+
+        if (
+                normalized.equalsIgnoreCase(
+                        "Marketing Manager"
+                )
+        ) {
+
+            response.setPersonaNarrative(
+                    String.format(
+                            Locale.ROOT,
+                            "Revenue changed by %.2f%% while marketing conversions changed by %.2f%%. Marketing performance should be reviewed alongside demand and supply signals before reallocating budget.",
+                            revenueChange,
+                            conversionChange
+                    )
+            );
+
+            response.setPersonaAction(
+                    "Prioritize campaigns with stronger conversion efficiency, review underperforming campaigns and coordinate demand signals with inventory availability."
+            );
+
+        } else if (
+                normalized.equalsIgnoreCase(
+                        "Executive"
+                )
+        ) {
+
+            response.setPersonaNarrative(
+                    String.format(
+                            Locale.ROOT,
+                            "Revenue changed by %.2f%% while inventory availability changed by %.2f%%, stockout exposure changed by %.2f%% and marketing conversions changed by %.2f%%. The evidence indicates a measurable cross-functional business movement requiring review.",
+                            revenueChange,
+                            inventoryChange,
+                            stockoutDelta,
+                            conversionChange
+                    )
+            );
+
+            response.setPersonaAction(
+                    "Review the highest-impact driver, assign an accountable owner and monitor leading operational and commercial indicators before making a strategic decision."
+            );
+
+        } else {
+
+            response.setPersonaNarrative(
+                    String.format(
+                            Locale.ROOT,
+                            "Revenue changed by %.2f%% while inventory availability changed by %.2f%% and stockout exposure changed by %.2f%%. Supply-side constraints are therefore a key area for operational review.",
+                            revenueChange,
+                            inventoryChange,
+                            stockoutDelta
+                    )
+            );
+
+            response.setPersonaAction(
+                    "Prioritize replenishment of constrained products, investigate supplier delays, reduce stockout exposure and monitor inventory availability for revenue-critical products."
+            );
+        }
     }
 
     // =========================================================
@@ -1504,432 +1712,66 @@ public class MultiSourceAnalysisService {
     // =========================================================
 
     private String buildRecommendation(
-            String primaryDriver
+            String primaryDriver,
+            double revenueChange,
+            double quantityChange,
+            double inventoryChange,
+            double stockoutDelta,
+            double conversionChange
     ) {
 
-        if (
-                primaryDriver.contains(
-                        "Inventory"
-                )
-        ) {
+        if ("Stockout Hours".equals(primaryDriver)) {
 
-            return
-                    "Prioritize replenishment of constrained "
-                            + "products, investigate supplier delays, "
-                            + "reduce stockout exposure and monitor "
-                            + "availability for revenue-critical products.";
+            return "Prioritize replenishment for stockout-prone products, investigate supplier delays, reduce stockout exposure and monitor revenue impact daily.";
         }
 
-        if (
-                primaryDriver.equals(
-                        "Sales Volume"
-                )
-        ) {
+        if ("Inventory Availability".equals(primaryDriver)) {
 
-            return
-                    "Investigate products and regions with the "
-                            + "largest quantity decline and prioritize "
-                            + "recovery actions for high-revenue items.";
+            return "Review constrained inventory, prioritize revenue-critical products and investigate availability bottlenecks before demand is lost.";
         }
 
-        if (
-                primaryDriver.equals(
-                        "Average Price"
-                )
-        ) {
+        if ("Marketing Conversions".equals(primaryDriver)) {
 
-            return
-                    "Review pricing, discounting and product mix "
-                            + "to determine whether price changes are "
-                            + "affecting revenue performance.";
+            return "Review campaigns with declining conversions, compare conversion efficiency against spend and reallocate budget toward stronger-performing campaigns.";
         }
 
-        if (
-                primaryDriver.equals(
-                        "Marketing Conversions"
-                )
-        ) {
+        if ("Average Price".equals(primaryDriver)) {
 
-            return
-                    "Review campaign efficiency and reallocate "
-                            + "spend toward campaigns and categories "
-                            + "with stronger conversion performance.";
+            return "Review recent pricing changes, identify products with material price movement and validate whether price changes are affecting demand and revenue.";
         }
 
-        if (
-                primaryDriver.contains(
-                        "Marketing"
-                )
-        ) {
+        if ("Sales Volume".equals(primaryDriver)) {
 
-            return
-                    "Coordinate sales and marketing teams to "
-                            + "investigate the conversion decline while "
-                            + "protecting high-performing campaigns.";
+            return "Investigate demand changes by product and category, identify declining volume segments and coordinate corrective commercial actions.";
         }
 
-        return
-                "Run a focused cross-functional review across "
-                        + "sales, inventory and marketing because "
-                        + "multiple interacting signals are present.";
+        return "Review the KPI movement and validate the highest-impact driver before taking automated action.";
     }
-
-    // =========================================================
-    // OWNER
-    // =========================================================
-
-    private String determineOwner(
-            String primaryDriver
-    ) {
-
-        if (
-                primaryDriver.contains(
-                        "Inventory"
-                )
-        ) {
-
-            return "Supply Chain Manager";
-        }
-
-        if (
-                primaryDriver.contains(
-                        "Sales"
-                )
-        ) {
-
-            return "Sales Manager";
-        }
-
-        if (
-                primaryDriver.contains(
-                        "Price"
-                )
-        ) {
-
-            return "Pricing / Commercial Manager";
-        }
-
-        if (
-                primaryDriver.contains(
-                        "Marketing"
-                )
-        ) {
-
-            return "Marketing Manager";
-        }
-
-        return "Business Operations Manager";
-    }
-
-    // =========================================================
-    // MONITORING
-    // =========================================================
 
     private String buildMonitoringPlan(
             String primaryDriver
     ) {
 
-        if (
-                primaryDriver.contains(
-                        "Inventory"
-                )
-        ) {
+        return switch (primaryDriver) {
 
-            return
-                    "Monitor stock availability, stockout hours "
-                            + "and supplier delay daily for affected products.";
-        }
+            case "Stockout Hours" ->
+                    "Monitor stockout hours, stock availability, supplier delays and revenue-critical products daily.";
 
-        if (
-                primaryDriver.contains(
-                        "Sales"
-                )
-        ) {
+            case "Inventory Availability" ->
+                    "Monitor available inventory, constrained SKUs, stockout exposure and replenishment lead time daily.";
 
-            return
-                    "Monitor daily quantity, revenue by product "
-                            + "and region, and recovery of high-impact products.";
-        }
+            case "Marketing Conversions" ->
+                    "Monitor campaign spend, conversions, conversion efficiency and campaign-level performance daily.";
 
-        if (
-                primaryDriver.contains(
-                        "Price"
-                )
-        ) {
+            case "Average Price" ->
+                    "Monitor average selling price, quantity movement and revenue by product/category.";
 
-            return
-                    "Monitor average selling price, discount rate "
-                            + "and revenue per unit.";
-        }
+            case "Sales Volume" ->
+                    "Monitor quantity, revenue and product-level demand trends daily.";
 
-        if (
-                primaryDriver.contains(
-                        "Marketing"
-                )
-        ) {
-
-            return
-                    "Monitor marketing spend, clicks, conversion "
-                            + "rate and campaign efficiency.";
-        }
-
-        return
-                "Monitor revenue, quantity, inventory and "
-                        + "marketing KPIs together for the next reporting cycle.";
-    }
-
-    // =========================================================
-    // PRODUCT EVIDENCE
-    // =========================================================
-
-    private void addTopProductEvidence(
-            List<String> evidence,
-            List<SalesRecord> baselineSales,
-            List<SalesRecord> recentSales
-    ) {
-
-        Map<String, Double> baselineByProduct =
-                new HashMap<>();
-
-        Map<String, Double> recentByProduct =
-                new HashMap<>();
-
-        for (
-                SalesRecord record :
-                baselineSales
-        ) {
-
-            String product =
-                    safeString(
-                            record.getProductId(),
-                            "Unknown"
-                    );
-
-            baselineByProduct.merge(
-                    product,
-                    record.getRevenue(),
-                    Double::sum
-            );
-        }
-
-        for (
-                SalesRecord record :
-                recentSales
-        ) {
-
-            String product =
-                    safeString(
-                            record.getProductId(),
-                            "Unknown"
-                    );
-
-            recentByProduct.merge(
-                    product,
-                    record.getRevenue(),
-                    Double::sum
-            );
-        }
-
-        String worstProduct = null;
-
-        double worstChange = 0;
-
-        for (
-                String product :
-                baselineByProduct.keySet()
-        ) {
-
-            double baseline =
-                    baselineByProduct.getOrDefault(
-                            product,
-                            0.0
-                    );
-
-            double recent =
-                    recentByProduct.getOrDefault(
-                            product,
-                            0.0
-                    );
-
-            double change =
-                    percentageChange(
-                            baseline,
-                            recent
-                    );
-
-            if (
-                    change < worstChange
-            ) {
-
-                worstChange =
-                        change;
-
-                worstProduct =
-                        product;
-            }
-        }
-
-        if (
-                worstProduct != null
-        ) {
-
-            evidence.add(
-                    "Product "
-                            + worstProduct
-                            + " had the largest "
-                            + "revenue decline at "
-                            + formatPercent(
-                            worstChange
-                    )
-                            + "."
-            );
-        }
-    }
-
-    // =========================================================
-    // INVENTORY EVIDENCE
-    // =========================================================
-
-    private void addInventoryEvidence(
-            List<String> evidence,
-            List<InventoryRecord> inventory
-    ) {
-
-        if (inventory.isEmpty()) {
-            return;
-        }
-
-        InventoryRecord highestStockout =
-                inventory.stream()
-                        .max(
-                                Comparator.comparingDouble(
-                                        InventoryRecord::getStockoutHours
-                                )
-                        )
-                        .orElse(null);
-
-        if (
-                highestStockout != null
-                        && highestStockout
-                        .getStockoutHours() > 0
-        ) {
-
-            evidence.add(
-                    "Highest recorded stockout exposure "
-                            + "was "
-                            + formatNumber(
-                            highestStockout
-                                    .getStockoutHours()
-                    )
-                            + " hours for product "
-                            + safeString(
-                            highestStockout.getProductId(),
-                            "Unknown"
-                    )
-                            + "."
-            );
-        }
-
-        InventoryRecord longestDelay =
-                inventory.stream()
-                        .max(
-                                Comparator.comparingDouble(
-                                        InventoryRecord::getSupplierDelay
-                                )
-                        )
-                        .orElse(null);
-
-        if (
-                longestDelay != null
-                        && longestDelay
-                        .getSupplierDelay() > 0
-        ) {
-
-            evidence.add(
-                    "Maximum supplier delay reached "
-                            + formatNumber(
-                            longestDelay
-                                    .getSupplierDelay()
-                    )
-                            + " days for product "
-                            + safeString(
-                            longestDelay.getProductId(),
-                            "Unknown"
-                    )
-                            + "."
-            );
-        }
-    }
-
-    // =========================================================
-    // MARKETING EVIDENCE
-    // =========================================================
-
-    private void addMarketingEvidence(
-            List<String> evidence,
-            List<MarketingRecord> marketing
-    ) {
-
-        if (marketing.isEmpty()) {
-            return;
-        }
-
-        MarketingRecord best =
-                marketing.stream()
-                        .max(
-                                Comparator.comparingDouble(
-                                        MarketingRecord::getConversions
-                                )
-                        )
-                        .orElse(null);
-
-        if (
-                best != null
-        ) {
-
-            evidence.add(
-                    "Highest recorded marketing "
-                            + "conversions were "
-                            + formatNumber(
-                            best.getConversions()
-                    )
-                            + " under campaign "
-                            + safeString(
-                            best.getCampaign(),
-                            "Unknown"
-                    )
-                            + "."
-            );
-        }
-
-        double totalSpend =
-                sumMarketingSpend(
-                        marketing
-                );
-
-        double totalConversion =
-                sumMarketingConversions(
-                        marketing
-                );
-
-        if (
-                totalSpend > 0
-        ) {
-
-            double conversionEfficiency =
-                    totalConversion /
-                            totalSpend;
-
-            evidence.add(
-                    "Recent marketing conversion "
-                            + "efficiency was "
-                            + String.format(
-                            Locale.US,
-                            "%.4f conversions per currency unit spent.",
-                            conversionEfficiency
-                    )
-            );
-        }
+            default ->
+                    "Monitor KPI movement, driver changes, source freshness and data quality.";
+        };
     }
 
     // =========================================================
@@ -1940,878 +1782,156 @@ public class MultiSourceAnalysisService {
             List<SalesRecord> sales,
             List<InventoryRecord> inventory,
             List<MarketingRecord> marketing,
+            int commonDateCount,
+            int baselineSalesCount,
+            int recentSalesCount,
+            int baselineInventoryCount,
+            int recentInventoryCount,
+            int baselineMarketingCount,
+            int recentMarketingCount,
             double quantityChange,
-            double stockChange,
-            double stockoutDelta,
-            double conversionChange
+            double inventoryChange,
+            double stockoutChange,
+            double conversionChange,
+            double revenueChange,
+            SparseHistoryAssessment sparse
     ) {
 
-        double confidence =
-                0.60;
+        double confidence = 0.40;
 
-        if (
-                sales.size() >= 10
-        ) {
+        if (sales.size() >= 10) {
+            confidence += 0.04;
+        }
 
-            confidence += 0.08;
+        if (inventory.size() >= 10) {
+            confidence += 0.04;
+        }
+
+        if (marketing.size() >= 10) {
+            confidence += 0.04;
+        }
+
+        if (commonDateCount >= 7) {
+            confidence += 0.10;
+        }
+
+        if (commonDateCount >= 14) {
+            confidence += 0.05;
         }
 
         if (
-                inventory.size() >= 10
+                baselineSalesCount >= 2
+                        && recentSalesCount >= 2
         ) {
-
-            confidence += 0.08;
+            confidence += 0.03;
         }
 
         if (
-                marketing.size() >= 10
+                baselineInventoryCount >= 2
+                        && recentInventoryCount >= 2
         ) {
-
-            confidence += 0.08;
+            confidence += 0.03;
         }
 
+        if (
+                baselineMarketingCount >= 2
+                        && recentMarketingCount >= 2
+        ) {
+            confidence += 0.03;
+        }
+
+        /*
+         * Strong supply-side consistency:
+         * inventory down + stockout exposure up.
+         */
         boolean supplySignal =
-                stockChange < -10
-                        && stockoutDelta > 0;
+                inventoryChange < -10
+                        && stockoutChange > 10;
 
-        boolean salesSignal =
+        boolean demandSignal =
                 quantityChange < -5;
 
         boolean marketingSignal =
                 conversionChange < -5;
 
+        if (supplySignal) {
+            confidence += 0.05;
+        }
+
         if (
                 supplySignal
-                        && salesSignal
+                        && demandSignal
+                        && revenueChange < -2
         ) {
-
-            confidence += 0.08;
+            confidence += 0.06;
         }
 
         if (
                 marketingSignal
-                        && salesSignal
+                        && demandSignal
+                        && revenueChange < -2
         ) {
-
-            confidence += 0.05;
+            confidence += 0.04;
         }
 
-        return Math.min(
+        int activeSignals = 0;
+
+        if (Math.abs(quantityChange) >= 5) {
+            activeSignals++;
+        }
+
+        if (Math.abs(inventoryChange) >= 10) {
+            activeSignals++;
+        }
+
+        if (Math.abs(stockoutChange) >= 10) {
+            activeSignals++;
+        }
+
+        if (Math.abs(conversionChange) >= 5) {
+            activeSignals++;
+        }
+
+        if (Math.abs(revenueChange) >= 5) {
+            activeSignals++;
+        }
+
+        if (activeSignals == 0) {
+            confidence -= 0.15;
+        }
+
+        if (activeSignals >= 3) {
+            confidence += 0.04;
+        }
+
+        /*
+         * Sparse history is a major confidence penalty.
+         */
+        if (sparse.sparse) {
+            confidence -= 0.30;
+        }
+
+        /*
+         * Prevent a misleadingly high confidence when
+         * revenue itself is stable and driver movements
+         * are weak.
+         */
+        if (
+                Math.abs(revenueChange) < 2
+                        && activeSignals <= 1
+        ) {
+            confidence -= 0.10;
+        }
+
+        return clamp(
                 confidence,
-                0.95
+                0.0,
+                0.90
         );
     }
 
     // =========================================================
-    // SALES CSV READER
-    // =========================================================
-
-    private List<SalesRecord> readSalesFile(
-            MultipartFile file
-    ) throws IOException {
-
-        List<SalesRecord> records =
-                new ArrayList<>();
-
-        try (
-                BufferedReader reader =
-                        new BufferedReader(
-                                new InputStreamReader(
-                                        file.getInputStream(),
-                                        StandardCharsets.UTF_8
-                                )
-                        )
-        ) {
-
-            String header =
-                    reader.readLine();
-
-            if (
-                    header == null
-                            || header.trim().isEmpty()
-            ) {
-
-                return records;
-            }
-
-            Map<String, Integer> columns =
-                    buildColumnMap(
-                            header
-                    );
-
-            validateRequiredColumns(
-                    columns,
-                    List.of(
-                            "date",
-                            "product_id",
-                            "quantity",
-                            "revenue"
-                    ),
-                    "Sales"
-            );
-
-            String line;
-
-            while (
-                    (line =
-                            reader.readLine()) != null
-            ) {
-
-                if (
-                        line.trim().isEmpty()
-                ) {
-
-                    continue;
-                }
-
-                String[] values =
-                        splitCsv(
-                                line
-                        );
-
-                String date =
-                        getValue(
-                                values,
-                                columns,
-                                "date"
-                        );
-
-                if (
-                        date.isBlank()
-                ) {
-                    continue;
-                }
-
-                String productId =
-                        getValue(
-                                values,
-                                columns,
-                                "product_id"
-                        );
-
-                String category =
-                        getValue(
-                                values,
-                                columns,
-                                "category"
-                        );
-
-                String region =
-                        getValue(
-                                values,
-                                columns,
-                                "region"
-                        );
-
-                double quantity =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "quantity"
-                                )
-                        );
-
-                double unitPrice =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "unit_price"
-                                )
-                        );
-
-                double cost =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "cost"
-                                )
-                        );
-
-                double revenue =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "revenue"
-                                )
-                        );
-
-                records.add(
-                        new SalesRecord(
-                                date,
-                                productId,
-                                category,
-                                region,
-                                quantity,
-                                unitPrice,
-                                cost,
-                                revenue
-                        )
-                );
-            }
-        }
-
-        return records;
-    }
-
-    // =========================================================
-    // INVENTORY CSV READER
-    // =========================================================
-
-    private List<InventoryRecord> readInventoryFile(
-            MultipartFile file
-    ) throws IOException {
-
-        List<InventoryRecord> records =
-                new ArrayList<>();
-
-        try (
-                BufferedReader reader =
-                        new BufferedReader(
-                                new InputStreamReader(
-                                        file.getInputStream(),
-                                        StandardCharsets.UTF_8
-                                )
-                        )
-        ) {
-
-            String header =
-                    reader.readLine();
-
-            if (
-                    header == null
-                            || header.trim().isEmpty()
-            ) {
-
-                return records;
-            }
-
-            Map<String, Integer> columns =
-                    buildColumnMap(
-                            header
-                    );
-
-            validateRequiredColumns(
-                    columns,
-                    List.of(
-                            "date",
-                            "product_id",
-                            "stock_available",
-                            "stockout_hours",
-                            "supplier_delay"
-                    ),
-                    "Inventory"
-            );
-
-            String line;
-
-            while (
-                    (line =
-                            reader.readLine()) != null
-            ) {
-
-                if (
-                        line.trim().isEmpty()
-                ) {
-
-                    continue;
-                }
-
-                String[] values =
-                        splitCsv(
-                                line
-                        );
-
-                String date =
-                        getValue(
-                                values,
-                                columns,
-                                "date"
-                        );
-
-                if (
-                        date.isBlank()
-                ) {
-                    continue;
-                }
-
-                String productId =
-                        getValue(
-                                values,
-                                columns,
-                                "product_id"
-                        );
-
-                String category =
-                        getValue(
-                                values,
-                                columns,
-                                "category"
-                        );
-
-                double stockAvailable =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "stock_available"
-                                )
-                        );
-
-                double stockoutHours =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "stockout_hours"
-                                )
-                        );
-
-                double supplierDelay =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "supplier_delay"
-                                )
-                        );
-
-                records.add(
-                        new InventoryRecord(
-                                date,
-                                productId,
-                                category,
-                                stockAvailable,
-                                stockoutHours,
-                                supplierDelay
-                        )
-                );
-            }
-        }
-
-        return records;
-    }
-
-    // =========================================================
-    // MARKETING CSV READER
-    // =========================================================
-
-    private List<MarketingRecord> readMarketingFile(
-            MultipartFile file
-    ) throws IOException {
-
-        List<MarketingRecord> records =
-                new ArrayList<>();
-
-        try (
-                BufferedReader reader =
-                        new BufferedReader(
-                                new InputStreamReader(
-                                        file.getInputStream(),
-                                        StandardCharsets.UTF_8
-                                )
-                        )
-        ) {
-
-            String header =
-                    reader.readLine();
-
-            if (
-                    header == null
-                            || header.trim().isEmpty()
-            ) {
-
-                return records;
-            }
-
-            Map<String, Integer> columns =
-                    buildColumnMap(
-                            header
-                    );
-
-            validateRequiredColumns(
-                    columns,
-                    List.of(
-                            "date",
-                            "campaign",
-                            "spend",
-                            "conversions"
-                    ),
-                    "Marketing"
-            );
-
-            String line;
-
-            while (
-                    (line =
-                            reader.readLine()) != null
-            ) {
-
-                if (
-                        line.trim().isEmpty()
-                ) {
-
-                    continue;
-                }
-
-                String[] values =
-                        splitCsv(
-                                line
-                        );
-
-                String date =
-                        getValue(
-                                values,
-                                columns,
-                                "date"
-                        );
-
-                if (
-                        date.isBlank()
-                ) {
-                    continue;
-                }
-
-                String campaign =
-                        getValue(
-                                values,
-                                columns,
-                                "campaign"
-                        );
-
-                String category =
-                        getValue(
-                                values,
-                                columns,
-                                "category"
-                        );
-
-                double spend =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "spend"
-                                )
-                        );
-
-                double impressions =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "impressions"
-                                )
-                        );
-
-                double clicks =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "clicks"
-                                )
-                        );
-
-                double conversions =
-                        parseDouble(
-                                getValue(
-                                        values,
-                                        columns,
-                                        "conversions"
-                                )
-                        );
-
-                records.add(
-                        new MarketingRecord(
-                                date,
-                                campaign,
-                                category,
-                                spend,
-                                impressions,
-                                clicks,
-                                conversions
-                        )
-                );
-            }
-        }
-
-        return records;
-    }
-
-    // =========================================================
-    // CSV UTILITIES
-    // =========================================================
-
-    private Map<String, Integer> buildColumnMap(
-            String header
-    ) {
-
-        Map<String, Integer> columns =
-                new HashMap<>();
-
-        String[] headers =
-                splitCsv(
-                        header
-                );
-
-        for (
-                int i = 0;
-                i < headers.length;
-                i++
-        ) {
-
-            String column =
-                    headers[i]
-                            .trim()
-                            .replace(
-                                    "\uFEFF",
-                                    ""
-                            )
-                            .replace(
-                                    "\"",
-                                    ""
-                            )
-                            .toLowerCase(
-                                    Locale.ROOT
-                            );
-
-            columns.put(
-                    column,
-                    i
-            );
-        }
-
-        return columns;
-    }
-
-    private void validateRequiredColumns(
-            Map<String, Integer> columns,
-            List<String> requiredColumns,
-            String sourceName
-    ) {
-
-        List<String> missing =
-                new ArrayList<>();
-
-        for (
-                String column :
-                requiredColumns
-        ) {
-
-            if (
-                    !columns.containsKey(column)
-            ) {
-
-                missing.add(column);
-            }
-        }
-
-        if (
-                !missing.isEmpty()
-        ) {
-
-            throw new IllegalArgumentException(
-                    sourceName
-                            + " file is missing required column(s): "
-                            + String.join(
-                            ", ",
-                            missing
-                    )
-            );
-        }
-    }
-
-    private String getValue(
-            String[] values,
-            Map<String, Integer> columns,
-            String column
-    ) {
-
-        Integer index =
-                columns.get(
-                        column
-                );
-
-        if (
-                index == null
-                        || index < 0
-                        || index >= values.length
-        ) {
-
-            return "";
-        }
-
-        return values[index]
-                .trim()
-                .replace(
-                        "\"",
-                        ""
-                );
-    }
-
-    private String[] splitCsv(
-            String line
-    ) {
-
-        return line.split(
-                ",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)",
-                -1
-        );
-    }
-
-    private double parseDouble(
-            String value
-    ) {
-
-        if (
-                value == null
-                        || value.trim().isEmpty()
-        ) {
-
-            return 0;
-        }
-
-        try {
-
-            return Double.parseDouble(
-                    value.trim()
-                            .replace(
-                                    "\"",
-                                    ""
-                            )
-                            .replace(
-                                    ",",
-                                    ""
-                            )
-            );
-
-        } catch (
-                NumberFormatException e
-        ) {
-
-            return 0;
-        }
-    }
-
-    // =========================================================
-    // DATE PARSER
-    // =========================================================
-
-    private LocalDate parseDate(
-            String value
-    ) {
-
-        if (
-                value == null
-                        || value.isBlank()
-        ) {
-
-            throw new IllegalArgumentException(
-                    "Invalid or missing date value."
-            );
-        }
-
-        String date =
-                value.trim()
-                        .replace(
-                                "\"",
-                                ""
-                        );
-
-        List<DateTimeFormatter> formatters =
-                List.of(
-
-                        DateTimeFormatter.ISO_LOCAL_DATE,
-
-                        DateTimeFormatter.ofPattern(
-                                "dd/MM/yyyy"
-                        ),
-
-                        DateTimeFormatter.ofPattern(
-                                "d/M/yyyy"
-                        ),
-
-                        DateTimeFormatter.ofPattern(
-                                "MM/dd/yyyy"
-                        ),
-
-                        DateTimeFormatter.ofPattern(
-                                "M/d/yyyy"
-                        ),
-
-                        DateTimeFormatter.ofPattern(
-                                "dd-MM-yyyy"
-                        ),
-
-                        DateTimeFormatter.ofPattern(
-                                "d-M-yyyy"
-                        )
-                );
-
-        for (
-                DateTimeFormatter formatter :
-                formatters
-        ) {
-
-            try {
-
-                return LocalDate.parse(
-                        date,
-                        formatter
-                );
-
-            } catch (
-                    DateTimeParseException ignored
-            ) {
-
-                // Try next format
-            }
-        }
-
-        throw new IllegalArgumentException(
-                "Unsupported date format: "
-                        + value
-                        + ". Use a standard date such as "
-                        + "2026-08-01 or 01/08/2026."
-        );
-    }
-
-    // =========================================================
-    // SUM HELPERS
-    // =========================================================
-
-    private double sumSalesRevenue(
-            List<SalesRecord> records
-    ) {
-
-        return records.stream()
-                .mapToDouble(
-                        SalesRecord::getRevenue
-                )
-                .sum();
-    }
-
-    private double sumSalesQuantity(
-            List<SalesRecord> records
-    ) {
-
-        return records.stream()
-                .mapToDouble(
-                        SalesRecord::getQuantity
-                )
-                .sum();
-    }
-
-    private double sumInventoryStock(
-            List<InventoryRecord> records
-    ) {
-
-        return records.stream()
-                .mapToDouble(
-                        InventoryRecord::getStockAvailable
-                )
-                .sum();
-    }
-
-    private double sumInventoryStockout(
-            List<InventoryRecord> records
-    ) {
-
-        return records.stream()
-                .mapToDouble(
-                        InventoryRecord::getStockoutHours
-                )
-                .sum();
-    }
-
-    private double sumMarketingSpend(
-            List<MarketingRecord> records
-    ) {
-
-        return records.stream()
-                .mapToDouble(
-                        MarketingRecord::getSpend
-                )
-                .sum();
-    }
-
-    private double sumMarketingConversions(
-            List<MarketingRecord> records
-    ) {
-
-        return records.stream()
-                .mapToDouble(
-                        MarketingRecord::getConversions
-                )
-                .sum();
-    }
-
-    // =========================================================
-    // MATH
-    // =========================================================
-
-    private double percentageChange(
-            double oldValue,
-            double newValue
-    ) {
-
-        if (
-                oldValue == 0
-        ) {
-
-            if (
-                    newValue == 0
-            ) {
-
-                return 0;
-            }
-
-            return 100;
-        }
-
-        return (
-                (newValue - oldValue)
-                        / oldValue
-        ) * 100.0;
-    }
-
-    private double round(
-            double value
-    ) {
-
-        return Math.round(
-                value * 100.0
-        ) / 100.0;
-    }
-
-    private String formatPercent(
-            double value
-    ) {
-
-        return String.format(
-                Locale.US,
-                "%.1f%%",
-                value
-        );
-    }
-
-    private String formatNumber(
-            double value
-    ) {
-
-        return String.format(
-                Locale.US,
-                "%,.2f",
-                value
-        );
-    }
-
-    // =========================================================
-    // DRIVER IMPACT SCORE
+    // IMPACT
     // =========================================================
 
     private double calculateImpactScore(
@@ -2819,16 +1939,29 @@ public class MultiSourceAnalysisService {
             boolean positiveChangeIsBad
     ) {
 
+        if (!Double.isFinite(change)) {
+            return 0.0;
+        }
+
+        boolean harmfulMovement;
+
+        if (positiveChangeIsBad) {
+
+            harmfulMovement =
+                    change > 0;
+
+        } else {
+
+            harmfulMovement =
+                    change < 0;
+        }
+
+        if (!harmfulMovement) {
+            return 0.0;
+        }
+
         double magnitude =
                 Math.abs(change);
-
-        /*
-         * Impact score represents the strength
-         * of a business movement signal.
-         *
-         * It is a prioritization score,
-         * NOT a causal probability.
-         */
 
         double score =
                 Math.min(
@@ -2836,7 +1969,6 @@ public class MultiSourceAnalysisService {
                         100.0
                 );
 
-        // Very small movements get lower priority
         if (magnitude < 2) {
 
             score *= 0.35;
@@ -2851,40 +1983,2591 @@ public class MultiSourceAnalysisService {
         }
 
         return round(
-                Math.min(
+                clamp(
                         score,
+                        0.0,
                         100.0
                 )
         );
     }
 
-    // =========================================================
-    // IMPACT LEVEL
-    // =========================================================
-
-    private String getImpactLevel(
+    private String impactLevel(
             double score
     ) {
 
-        if (score >= 70) {
-
+        if (score >= 50) {
             return "High";
+        }
 
-        } else if (score >= 40) {
-
+        if (score >= 25) {
             return "Medium";
+        }
+
+        return "Low";
+    }
+
+    private Map<String, Double> sortByValueDescending(
+            Map<String, Double> source
+    ) {
+
+        return source.entrySet()
+                .stream()
+                .sorted(
+                        Map.Entry
+                                .<String, Double>comparingByValue()
+                                .reversed()
+                                .thenComparing(
+                                        Map.Entry::getKey
+                                )
+                )
+                .collect(
+                        Collectors.toMap(
+                                Map.Entry::getKey,
+                                Map.Entry::getValue,
+                                (a, b) -> a,
+                                LinkedHashMap::new
+                        )
+                );
+    }
+
+    // =========================================================
+    // DRIVER EXPLANATION
+    // =========================================================
+
+    private String buildDriverExplanation(
+            String primaryDriver,
+            double revenueChange,
+            double quantityChange,
+            double priceChange,
+            double inventoryChange,
+            double stockoutDelta,
+            double conversionChange
+    ) {
+
+        return String.format(
+                Locale.ROOT,
+                "Revenue changed by %.2f%%. Sales volume changed by %.2f%%, average price by %.2f%%, inventory availability by %.2f%%, stockout exposure by %.2f%% and marketing conversions by %.2f%%. %s is ranked highest by the movement-based driver prioritisation model. This is an explanatory prioritisation signal, not causal attribution.",
+                revenueChange,
+                quantityChange,
+                priceChange,
+                inventoryChange,
+                stockoutDelta,
+                conversionChange,
+                primaryDriver
+        );
+    }
+
+    // =========================================================
+    // PRODUCT EVIDENCE
+    // =========================================================
+
+    private void addLargestRevenueDeclineEvidence(
+            List<String> evidence,
+            List<SalesRecord> baselineSales,
+            List<SalesRecord> recentSales
+    ) {
+
+        Map<String, Double> baseline =
+                baselineSales.stream()
+                        .collect(
+                                Collectors.groupingBy(
+                                        r -> safeText(
+                                                r.getProduct(),
+                                                "Unknown Product"
+                                        ),
+                                        Collectors.summingDouble(
+                                                SalesRecord::getRevenue
+                                        )
+                                )
+                        );
+
+        Map<String, Double> recent =
+                recentSales.stream()
+                        .collect(
+                                Collectors.groupingBy(
+                                        r -> safeText(
+                                                r.getProduct(),
+                                                "Unknown Product"
+                                        ),
+                                        Collectors.summingDouble(
+                                                SalesRecord::getRevenue
+                                        )
+                                )
+                        );
+
+        String product = null;
+        double worstChange = 0.0;
+
+        for (String key : baseline.keySet()) {
+
+            if (!recent.containsKey(key)) {
+                continue;
+            }
+
+            double change =
+                    percentageChange(
+                            baseline.get(key),
+                            recent.get(key)
+                    );
+
+            if (
+                    change < worstChange
+                            && Double.isFinite(change)
+            ) {
+                worstChange = change;
+                product = key;
+            }
+        }
+
+        if (product != null) {
+
+            evidence.add(
+                    product
+                            + " largest revenue decline "
+                            + round(worstChange)
+                            + "%"
+            );
+        }
+    }
+
+    private void addHighestStockoutEvidence(
+            List<String> evidence,
+            List<InventoryRecord> inventory
+    ) {
+
+        inventory.stream()
+                .filter(
+                        r ->
+                                Double.isFinite(
+                                        r.getStockoutHours()
+                                )
+                )
+                .max(
+                        Comparator.comparingDouble(
+                                InventoryRecord::getStockoutHours
+                        )
+                )
+                .ifPresent(
+                        record ->
+                                evidence.add(
+                                        "Highest stockout exposure "
+                                                + safeText(
+                                                record.getProduct(),
+                                                "Unknown Product"
+                                        )
+                                                + ": "
+                                                + round(
+                                                record.getStockoutHours()
+                                        )
+                                                + " hours"
+                                )
+                );
+    }
+
+    private void addMaximumSupplierDelayEvidence(
+            List<String> evidence,
+            List<InventoryRecord> inventory
+    ) {
+
+        inventory.stream()
+                .filter(
+                        r ->
+                                Double.isFinite(
+                                        r.getSupplierDelay()
+                                )
+                )
+                .max(
+                        Comparator.comparingDouble(
+                                InventoryRecord::getSupplierDelay
+                        )
+                )
+                .ifPresent(
+                        record ->
+                                evidence.add(
+                                        "Maximum supplier delay "
+                                                + safeText(
+                                                record.getProduct(),
+                                                "Unknown Product"
+                                        )
+                                                + ": "
+                                                + round(
+                                                record.getSupplierDelay()
+                                        )
+                                                + " days"
+                                )
+                );
+    }
+
+    private void addHighestCampaignConversionEvidence(
+            List<String> evidence,
+            List<MarketingRecord> marketing
+    ) {
+
+        marketing.stream()
+                .filter(
+                        r ->
+                                Double.isFinite(
+                                        r.getConversions()
+                                )
+                )
+                .max(
+                        Comparator.comparingDouble(
+                                MarketingRecord::getConversions
+                        )
+                )
+                .ifPresent(
+                        record ->
+                                evidence.add(
+                                        "Highest campaign conversions "
+                                                + safeText(
+                                                record.getCampaign(),
+                                                "Unknown Campaign"
+                                        )
+                                                + ": "
+                                                + round(
+                                                record.getConversions()
+                                        )
+                                )
+                );
+    }
+
+    // =========================================================
+    // DATE FILTERS
+    // =========================================================
+
+    private List<SalesRecord> filterSalesByDates(
+            List<SalesRecord> records,
+            Set<LocalDate> dates
+    ) {
+
+        return records.stream()
+                .filter(
+                        r ->
+                                r.getDate() != null
+                                        && dates.contains(
+                                        r.getDate()
+                                )
+                )
+                .toList();
+    }
+
+    private List<InventoryRecord> filterInventoryByDates(
+            List<InventoryRecord> records,
+            Set<LocalDate> dates
+    ) {
+
+        return records.stream()
+                .filter(
+                        r ->
+                                r.getDate() != null
+                                        && dates.contains(
+                                        r.getDate()
+                                )
+                )
+                .toList();
+    }
+
+    private List<MarketingRecord> filterMarketingByDates(
+            List<MarketingRecord> records,
+            Set<LocalDate> dates
+    ) {
+
+        return records.stream()
+                .filter(
+                        r ->
+                                r.getDate() != null
+                                        && dates.contains(
+                                        r.getDate()
+                                )
+                )
+                .toList();
+    }
+
+    // =========================================================
+    // DISTINCT DATE HELPERS
+    // =========================================================
+
+    private Set<LocalDate> getDistinctDatesFromSales(
+            List<SalesRecord> records
+    ) {
+
+        return records.stream()
+                .map(SalesRecord::getDate)
+                .filter(Objects::nonNull)
+                .collect(
+                        Collectors.toCollection(
+                                TreeSet::new
+                        )
+                );
+    }
+
+    private Set<LocalDate> getDistinctDatesFromInventory(
+            List<InventoryRecord> records
+    ) {
+
+        return records.stream()
+                .map(InventoryRecord::getDate)
+                .filter(Objects::nonNull)
+                .collect(
+                        Collectors.toCollection(
+                                TreeSet::new
+                        )
+                );
+    }
+
+    private Set<LocalDate> getDistinctDatesFromMarketing(
+            List<MarketingRecord> records
+    ) {
+
+        return records.stream()
+                .map(MarketingRecord::getDate)
+                .filter(Objects::nonNull)
+                .collect(
+                        Collectors.toCollection(
+                                TreeSet::new
+                        )
+                );
+    }
+
+    // =========================================================
+    // FILE READING
+    // =========================================================
+
+    private List<SalesRecord> readSalesFile(
+            MultipartFile file
+    ) throws IOException {
+
+        if (isExcel(file)) {
+            return parseSalesExcel(file);
+        }
+
+        return parseSalesCsv(file);
+    }
+
+    private List<InventoryRecord> readInventoryFile(
+            MultipartFile file
+    ) throws IOException {
+
+        if (isExcel(file)) {
+            return parseInventoryExcel(file);
+        }
+
+        return parseInventoryCsv(file);
+    }
+
+    private List<MarketingRecord> readMarketingFile(
+            MultipartFile file
+    ) throws IOException {
+
+        if (isExcel(file)) {
+            return parseMarketingExcel(file);
+        }
+
+        return parseMarketingCsv(file);
+    }
+
+    private boolean isExcel(
+            MultipartFile file
+    ) {
+
+        String name =
+                safeText(
+                        file.getOriginalFilename(),
+                        ""
+                ).toLowerCase(
+                        Locale.ROOT
+                );
+
+        String contentType =
+                safeText(
+                        file.getContentType(),
+                        ""
+                ).toLowerCase(
+                        Locale.ROOT
+                );
+
+        return name.endsWith(".xlsx")
+                || name.endsWith(".xls")
+                || contentType.contains(
+                "spreadsheet"
+        )
+                || contentType.contains(
+                "excel"
+        );
+    }
+
+    // =========================================================
+    // CSV PARSERS
+    // =========================================================
+
+    private List<SalesRecord> parseSalesCsv(
+            MultipartFile file
+    ) throws IOException {
+
+        return parseCsv(
+                file,
+                SourceType.SALES
+        );
+    }
+
+    private List<InventoryRecord> parseInventoryCsv(
+            MultipartFile file
+    ) throws IOException {
+
+        return parseCsv(
+                file,
+                SourceType.INVENTORY
+        );
+    }
+
+    private List<MarketingRecord> parseMarketingCsv(
+            MultipartFile file
+    ) throws IOException {
+
+        return parseCsv(
+                file,
+                SourceType.MARKETING
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> parseCsv(
+            MultipartFile file,
+            SourceType sourceType
+    ) throws IOException {
+
+        List<T> records =
+                new ArrayList<>();
+
+        try (
+                BufferedReader reader =
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        file.getInputStream(),
+                                        StandardCharsets.UTF_8
+                                )
+                        )
+        ) {
+
+            String headerLine =
+                    reader.readLine();
+
+            if (
+                    headerLine == null
+                            || headerLine.isBlank()
+            ) {
+
+                throw new IllegalArgumentException(
+                        "CSV file has no header: "
+                                + file.getOriginalFilename()
+                );
+            }
+
+            String[] headers =
+                    splitCsvLine(
+                            headerLine
+                    );
+
+            Map<ColumnType, Integer> mapping =
+                    detectColumns(
+                            headers,
+                            sourceType
+                    );
+
+            validateRequiredColumns(
+                    mapping,
+                    sourceType
+            );
+
+            String line;
+
+            while (
+                    (line = reader.readLine())
+                            != null
+            ) {
+
+                if (line.isBlank()) {
+                    continue;
+                }
+
+                try {
+
+                    String[] columns =
+                            splitCsvLine(line);
+
+                    if (
+                            sourceType
+                                    == SourceType.SALES
+                    ) {
+
+                        LocalDate date =
+                                parseDate(
+                                        getValue(
+                                                columns,
+                                                mapping,
+                                                ColumnType.DATE
+                                        )
+                                );
+
+                        double quantity =
+                                getRequiredDoubleValue(
+                                        columns,
+                                        mapping,
+                                        ColumnType.QUANTITY
+                                );
+
+                        double revenue =
+                                getRequiredDoubleValue(
+                                        columns,
+                                        mapping,
+                                        ColumnType.REVENUE
+                                );
+
+                        records.add(
+                                (T)
+                                        new SalesRecord(
+                                                date,
+                                                getValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.PRODUCT
+                                                ),
+                                                getValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.CATEGORY
+                                                ),
+                                                getValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.REGION
+                                                ),
+                                                quantity,
+                                                getDoubleValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.UNIT_PRICE
+                                                ),
+                                                getDoubleValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.COST
+                                                ),
+                                                revenue
+                                        )
+                        );
+
+                    } else if (
+                            sourceType
+                                    == SourceType.INVENTORY
+                    ) {
+
+                        LocalDate date =
+                                parseDate(
+                                        getValue(
+                                                columns,
+                                                mapping,
+                                                ColumnType.DATE
+                                        )
+                                );
+
+                        double stock =
+                                getRequiredDoubleValue(
+                                        columns,
+                                        mapping,
+                                        ColumnType.STOCK_AVAILABLE
+                                );
+
+                        records.add(
+                                (T)
+                                        new InventoryRecord(
+                                                date,
+                                                getValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.PRODUCT
+                                                ),
+                                                getValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.CATEGORY
+                                                ),
+                                                stock,
+                                                getDoubleValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.STOCKOUT
+                                                ),
+                                                getDoubleValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.SUPPLIER_DELAY
+                                                )
+                                        )
+                        );
+
+                    } else {
+
+                        LocalDate date =
+                                parseDate(
+                                        getValue(
+                                                columns,
+                                                mapping,
+                                                ColumnType.DATE
+                                        )
+                                );
+
+                        double spend =
+                                getRequiredDoubleValue(
+                                        columns,
+                                        mapping,
+                                        ColumnType.SPEND
+                                );
+
+                        double conversions =
+                                getRequiredDoubleValue(
+                                        columns,
+                                        mapping,
+                                        ColumnType.CONVERSIONS
+                                );
+
+                        records.add(
+                                (T)
+                                        new MarketingRecord(
+                                                date,
+                                                getValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.CAMPAIGN
+                                                ),
+                                                getValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.CATEGORY
+                                                ),
+                                                spend,
+                                                getDoubleValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.IMPRESSIONS
+                                                ),
+                                                getDoubleValue(
+                                                        columns,
+                                                        mapping,
+                                                        ColumnType.CLICKS
+                                                ),
+                                                conversions
+                                        )
+                        );
+                    }
+
+                } catch (Exception ignored) {
+                    /*
+                     * Malformed row is rejected.
+                     * Valid rows continue processing.
+                     */
+                }
+            }
+        }
+
+        return records;
+    }
+
+    // =========================================================
+    // EXCEL PARSERS
+    // =========================================================
+
+    private List<SalesRecord> parseSalesExcel(
+            MultipartFile file
+    ) throws IOException {
+
+        List<SalesRecord> records =
+                new ArrayList<>();
+
+        try (
+                InputStream input =
+                        file.getInputStream();
+
+                Workbook workbook =
+                        WorkbookFactory.create(input)
+        ) {
+
+            if (workbook.getNumberOfSheets() == 0) {
+                throw new IllegalArgumentException(
+                        "Excel workbook has no sheets."
+                );
+            }
+
+            Sheet sheet =
+                    workbook.getSheetAt(0);
+
+            Iterator<Row> iterator =
+                    sheet.iterator();
+
+            if (!iterator.hasNext()) {
+                throw new IllegalArgumentException(
+                        "Excel sheet is empty."
+                );
+            }
+
+            Row headerRow =
+                    iterator.next();
+
+            String[] headers =
+                    excelRowToStrings(
+                            headerRow
+                    );
+
+            Map<ColumnType, Integer> mapping =
+                    detectColumns(
+                            headers,
+                            SourceType.SALES
+                    );
+
+            validateRequiredColumns(
+                    mapping,
+                    SourceType.SALES
+            );
+
+            while (iterator.hasNext()) {
+
+                Row row =
+                        iterator.next();
+
+                if (isEmptyExcelRow(row)) {
+                    continue;
+                }
+
+                try {
+
+                    LocalDate date =
+                            parseExcelDate(
+                                    getExcelCell(
+                                            row,
+                                            mapping,
+                                            ColumnType.DATE
+                                    )
+                            );
+
+                    double quantity =
+                            getRequiredExcelDouble(
+                                    row,
+                                    mapping,
+                                    ColumnType.QUANTITY
+                            );
+
+                    double revenue =
+                            getRequiredExcelDouble(
+                                    row,
+                                    mapping,
+                                    ColumnType.REVENUE
+                            );
+
+                    records.add(
+                            new SalesRecord(
+                                    date,
+                                    getExcelValue(
+                                            row,
+                                            mapping,
+                                            ColumnType.PRODUCT
+                                    ),
+                                    getExcelValue(
+                                            row,
+                                            mapping,
+                                            ColumnType.CATEGORY
+                                    ),
+                                    getExcelValue(
+                                            row,
+                                            mapping,
+                                            ColumnType.REGION
+                                    ),
+                                    quantity,
+                                    getExcelDouble(
+                                            row,
+                                            mapping,
+                                            ColumnType.UNIT_PRICE
+                                    ),
+                                    getExcelDouble(
+                                            row,
+                                            mapping,
+                                            ColumnType.COST
+                                    ),
+                                    revenue
+                            )
+                    );
+
+                } catch (Exception ignored) {
+                    // Reject malformed row.
+                }
+            }
+        }
+
+        return records;
+    }
+
+    private List<InventoryRecord> parseInventoryExcel(
+            MultipartFile file
+    ) throws IOException {
+
+        List<InventoryRecord> records =
+                new ArrayList<>();
+
+        try (
+                InputStream input =
+                        file.getInputStream();
+
+                Workbook workbook =
+                        WorkbookFactory.create(input)
+        ) {
+
+            if (workbook.getNumberOfSheets() == 0) {
+                throw new IllegalArgumentException(
+                        "Excel workbook has no sheets."
+                );
+            }
+
+            Sheet sheet =
+                    workbook.getSheetAt(0);
+
+            Iterator<Row> iterator =
+                    sheet.iterator();
+
+            if (!iterator.hasNext()) {
+                throw new IllegalArgumentException(
+                        "Excel sheet is empty."
+                );
+            }
+
+            Row headerRow =
+                    iterator.next();
+
+            String[] headers =
+                    excelRowToStrings(
+                            headerRow
+                    );
+
+            Map<ColumnType, Integer> mapping =
+                    detectColumns(
+                            headers,
+                            SourceType.INVENTORY
+                    );
+
+            validateRequiredColumns(
+                    mapping,
+                    SourceType.INVENTORY
+            );
+
+            while (iterator.hasNext()) {
+
+                Row row =
+                        iterator.next();
+
+                if (isEmptyExcelRow(row)) {
+                    continue;
+                }
+
+                try {
+
+                    LocalDate date =
+                            parseExcelDate(
+                                    getExcelCell(
+                                            row,
+                                            mapping,
+                                            ColumnType.DATE
+                                    )
+                            );
+
+                    double stock =
+                            getRequiredExcelDouble(
+                                    row,
+                                    mapping,
+                                    ColumnType.STOCK_AVAILABLE
+                            );
+
+                    records.add(
+                            new InventoryRecord(
+                                    date,
+                                    getExcelValue(
+                                            row,
+                                            mapping,
+                                            ColumnType.PRODUCT
+                                    ),
+                                    getExcelValue(
+                                            row,
+                                            mapping,
+                                            ColumnType.CATEGORY
+                                    ),
+                                    stock,
+                                    getExcelDouble(
+                                            row,
+                                            mapping,
+                                            ColumnType.STOCKOUT
+                                    ),
+                                    getExcelDouble(
+                                            row,
+                                            mapping,
+                                            ColumnType.SUPPLIER_DELAY
+                                    )
+                            )
+                    );
+
+                } catch (Exception ignored) {
+                    // Reject malformed row.
+                }
+            }
+        }
+
+        return records;
+    }
+
+    private List<MarketingRecord> parseMarketingExcel(
+            MultipartFile file
+    ) throws IOException {
+
+        List<MarketingRecord> records =
+                new ArrayList<>();
+
+        try (
+                InputStream input =
+                        file.getInputStream();
+
+                Workbook workbook =
+                        WorkbookFactory.create(input)
+        ) {
+
+            if (workbook.getNumberOfSheets() == 0) {
+                throw new IllegalArgumentException(
+                        "Excel workbook has no sheets."
+                );
+            }
+
+            Sheet sheet =
+                    workbook.getSheetAt(0);
+
+            Iterator<Row> iterator =
+                    sheet.iterator();
+
+            if (!iterator.hasNext()) {
+                throw new IllegalArgumentException(
+                        "Excel sheet is empty."
+                );
+            }
+
+            Row headerRow =
+                    iterator.next();
+
+            String[] headers =
+                    excelRowToStrings(
+                            headerRow
+                    );
+
+            Map<ColumnType, Integer> mapping =
+                    detectColumns(
+                            headers,
+                            SourceType.MARKETING
+                    );
+
+            validateRequiredColumns(
+                    mapping,
+                    SourceType.MARKETING
+            );
+
+            while (iterator.hasNext()) {
+
+                Row row =
+                        iterator.next();
+
+                if (isEmptyExcelRow(row)) {
+                    continue;
+                }
+
+                try {
+
+                    LocalDate date =
+                            parseExcelDate(
+                                    getExcelCell(
+                                            row,
+                                            mapping,
+                                            ColumnType.DATE
+                                    )
+                            );
+
+                    double spend =
+                            getRequiredExcelDouble(
+                                    row,
+                                    mapping,
+                                    ColumnType.SPEND
+                            );
+
+                    double conversions =
+                            getRequiredExcelDouble(
+                                    row,
+                                    mapping,
+                                    ColumnType.CONVERSIONS
+                            );
+
+                    records.add(
+                            new MarketingRecord(
+                                    date,
+                                    getExcelValue(
+                                            row,
+                                            mapping,
+                                            ColumnType.CAMPAIGN
+                                    ),
+                                    getExcelValue(
+                                            row,
+                                            mapping,
+                                            ColumnType.CATEGORY
+                                    ),
+                                    spend,
+                                    getExcelDouble(
+                                            row,
+                                            mapping,
+                                            ColumnType.IMPRESSIONS
+                                    ),
+                                    getExcelDouble(
+                                            row,
+                                            mapping,
+                                            ColumnType.CLICKS
+                                    ),
+                                    conversions
+                            )
+                    );
+
+                } catch (Exception ignored) {
+                    // Reject malformed row.
+                }
+            }
+        }
+
+        return records;
+    }
+
+    // =========================================================
+    // VALIDATION
+    // =========================================================
+
+    private List<SalesRecord> validateSalesRecords(
+            List<SalesRecord> records
+    ) {
+
+        return records.stream()
+                .filter(Objects::nonNull)
+                .filter(
+                        r ->
+                                r.getDate() != null
+                                        && Double.isFinite(
+                                        r.getQuantity()
+                                )
+                                        && Double.isFinite(
+                                        r.getRevenue()
+                                )
+                )
+                .map(
+                        r ->
+                                new SalesRecord(
+                                        r.getDate(),
+                                        safeText(
+                                                r.getProduct(),
+                                                "Unknown Product"
+                                        ),
+                                        safeText(
+                                                r.getCategory(),
+                                                "Unknown Category"
+                                        ),
+                                        safeText(
+                                                r.getRegion(),
+                                                "Unknown Region"
+                                        ),
+                                        safeNumber(
+                                                r.getQuantity()
+                                        ),
+                                        safeNumber(
+                                                r.getUnitPrice()
+                                        ),
+                                        safeNumber(
+                                                r.getCost()
+                                        ),
+                                        safeNumber(
+                                                r.getRevenue()
+                                        )
+                                )
+                )
+                .toList();
+    }
+
+    private List<InventoryRecord> validateInventoryRecords(
+            List<InventoryRecord> records
+    ) {
+
+        return records.stream()
+                .filter(Objects::nonNull)
+                .filter(
+                        r ->
+                                r.getDate() != null
+                                        && Double.isFinite(
+                                        r.getStockAvailable()
+                                )
+                )
+                .map(
+                        r ->
+                                new InventoryRecord(
+                                        r.getDate(),
+                                        safeText(
+                                                r.getProduct(),
+                                                "Unknown Product"
+                                        ),
+                                        safeText(
+                                                r.getCategory(),
+                                                "Unknown Category"
+                                        ),
+                                        safeNumber(
+                                                r.getStockAvailable()
+                                        ),
+                                        safeNumber(
+                                                r.getStockoutHours()
+                                        ),
+                                        safeNumber(
+                                                r.getSupplierDelay()
+                                        )
+                                )
+                )
+                .toList();
+    }
+
+    private List<MarketingRecord> validateMarketingRecords(
+            List<MarketingRecord> records
+    ) {
+
+        return records.stream()
+                .filter(Objects::nonNull)
+                .filter(
+                        r ->
+                                r.getDate() != null
+                                        && Double.isFinite(
+                                        r.getSpend()
+                                )
+                                        && Double.isFinite(
+                                        r.getConversions()
+                                )
+                )
+                .map(
+                        r ->
+                                new MarketingRecord(
+                                        r.getDate(),
+                                        safeText(
+                                                r.getCampaign(),
+                                                "Unknown Campaign"
+                                        ),
+                                        safeText(
+                                                r.getCategory(),
+                                                "Unknown Category"
+                                        ),
+                                        safeNumber(
+                                                r.getSpend()
+                                        ),
+                                        safeNumber(
+                                                r.getImpressions()
+                                        ),
+                                        safeNumber(
+                                                r.getClicks()
+                                        ),
+                                        safeNumber(
+                                                r.getConversions()
+                                        )
+                                )
+                )
+                .toList();
+    }
+
+    // =========================================================
+    // HEADER DETECTION
+    // =========================================================
+
+    private Map<ColumnType, Integer> detectColumns(
+            String[] headers,
+            SourceType sourceType
+    ) {
+
+        Map<ColumnType, Integer> mapping =
+                new EnumMap<>(
+                        ColumnType.class
+                );
+
+        for (int i = 0; i < headers.length; i++) {
+
+            String normalized =
+                    normalizeHeader(
+                            headers[i]
+                    );
+
+            if (normalized.isBlank()) {
+                continue;
+            }
+
+            ColumnType detected =
+                    detectColumnType(
+                            normalized,
+                            sourceType
+                    );
+
+            if (
+                    detected != null
+                            && !mapping.containsKey(
+                            detected
+                    )
+            ) {
+
+                mapping.put(
+                        detected,
+                        i
+                );
+            }
+        }
+
+        return mapping;
+    }
+
+    private ColumnType detectColumnType(
+            String header,
+            SourceType sourceType
+    ) {
+
+        // =====================================================
+        // DATE
+        // =====================================================
+
+        if (
+                matches(
+                        header,
+                        "date",
+                        "day",
+                        "datetime",
+                        "timestamp",
+                        "salesdate",
+                        "inventorydate",
+                        "marketingdate",
+                        "transactiondate"
+                )
+        ) {
+            return ColumnType.DATE;
+        }
+
+        // =====================================================
+        // SALES
+        // =====================================================
+
+        if (sourceType == SourceType.SALES) {
+
+            if (
+                    matches(
+                            header,
+                            "product",
+                            "productid",
+                            "productname",
+                            "sku",
+                            "item",
+                            "itemid"
+                    )
+            ) {
+                return ColumnType.PRODUCT;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "category",
+                            "productcategory",
+                            "categoryname"
+                    )
+            ) {
+                return ColumnType.CATEGORY;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "region",
+                            "area",
+                            "territory",
+                            "market"
+                    )
+            ) {
+                return ColumnType.REGION;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "quantity",
+                            "qty",
+                            "units",
+                            "unitssold",
+                            "salesquantity",
+                            "volume"
+                    )
+            ) {
+                return ColumnType.QUANTITY;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "unitprice",
+                            "price",
+                            "sellingprice",
+                            "sellingunitprice",
+                            "avgprice"
+                    )
+            ) {
+                return ColumnType.UNIT_PRICE;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "cost",
+                            "unitcost",
+                            "productcost",
+                            "costprice"
+                    )
+            ) {
+                return ColumnType.COST;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "revenue",
+                            "salesrevenue",
+                            "totalrevenue",
+                            "amount",
+                            "salesamount",
+                            "totalamount"
+                    )
+            ) {
+                return ColumnType.REVENUE;
+            }
+
+            if (header.contains("revenue")) {
+                return ColumnType.REVENUE;
+            }
+
+            if (
+                    header.contains("quantity")
+                            || header.contains("qty")
+            ) {
+                return ColumnType.QUANTITY;
+            }
+
+            if (
+                    header.contains("unitprice")
+                            || header.equals("price")
+            ) {
+                return ColumnType.UNIT_PRICE;
+            }
+        }
+
+        // =====================================================
+        // INVENTORY
+        // =====================================================
+
+        if (sourceType == SourceType.INVENTORY) {
+
+            /*
+             * CRITICAL:
+             * stockout checked BEFORE stock.
+             *
+             * Therefore:
+             * stockout_hours -> STOCKOUT
+             * stock_available -> STOCK_AVAILABLE
+             */
+            if (
+                    matches(
+                            header,
+                            "stockouthours",
+                            "stockouthour",
+                            "stockout",
+                            "outofstockhours",
+                            "outofstock",
+                            "stockoutduration",
+                            "stockouttime"
+                    )
+            ) {
+                return ColumnType.STOCKOUT;
+            }
+
+            if (
+                    header.contains("stockout")
+                            || header.contains("outofstock")
+            ) {
+                return ColumnType.STOCKOUT;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "supplierdelay",
+                            "supplierdelaydays",
+                            "supplierdelayday",
+                            "deliverydelay",
+                            "leadtime",
+                            "supplierleadtime",
+                            "deliverydelaydays"
+                    )
+            ) {
+                return ColumnType.SUPPLIER_DELAY;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "stock",
+                            "stockavailable",
+                            "availablestock",
+                            "stockavailableunits",
+                            "inventory",
+                            "inventorylevel",
+                            "stocklevel",
+                            "onhand",
+                            "onhandstock",
+                            "availableinventory",
+                            "availableinventoryunits",
+                            "currentstock",
+                            "endinginventory",
+                            "closingstock"
+                    )
+            ) {
+                return ColumnType.STOCK_AVAILABLE;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "product",
+                            "productid",
+                            "productname",
+                            "sku",
+                            "item",
+                            "itemid"
+                    )
+            ) {
+                return ColumnType.PRODUCT;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "category",
+                            "productcategory",
+                            "categoryname"
+                    )
+            ) {
+                return ColumnType.CATEGORY;
+            }
+
+            if (
+                    header.contains("supplier")
+                            && header.contains("delay")
+            ) {
+                return ColumnType.SUPPLIER_DELAY;
+            }
+
+            /*
+             * Avoid interpreting stockout_hours as stock.
+             */
+            if (
+                    (header.contains("stock")
+                            || header.contains("inventory"))
+                            && !header.contains("out")
+            ) {
+                return ColumnType.STOCK_AVAILABLE;
+            }
+        }
+
+        // =====================================================
+        // MARKETING
+        // =====================================================
+
+        if (sourceType == SourceType.MARKETING) {
+
+            if (
+                    matches(
+                            header,
+                            "campaign",
+                            "campaignname",
+                            "campaignid",
+                            "adcampaign",
+                            "marketingcampaign"
+                    )
+            ) {
+                return ColumnType.CAMPAIGN;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "category",
+                            "productcategory",
+                            "categoryname"
+                    )
+            ) {
+                return ColumnType.CATEGORY;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "spend",
+                            "marketingspend",
+                            "adspend",
+                            "advertisingspend",
+                            "campaignspend",
+                            "marketingcost",
+                            "advertisingcost",
+                            "spendamount",
+                            "adcost",
+                            "budgetspent",
+                            "totalspend",
+                            "totalmarketingspend",
+                            "marketinginvestment"
+                    )
+            ) {
+                return ColumnType.SPEND;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "impressions",
+                            "impression",
+                            "views",
+                            "adimpressions"
+                    )
+            ) {
+                return ColumnType.IMPRESSIONS;
+            }
+
+            if (
+                    matches(
+                            header,
+                            "clicks",
+                            "click",
+                            "adclicks"
+                    )
+            ) {
+                return ColumnType.CLICKS;
+            }
+
+            /*
+             * IMPORTANT:
+             * Explicit conversion aliases only.
+             *
+             * We intentionally do NOT match:
+             * conversionrate
+             * conversionpercentage
+             * conversionratio
+             *
+             * because those are ratios, not conversion counts.
+             */
+            if (
+                    matches(
+                            header,
+                            "conversions",
+                            "conversion",
+                            "conversioncount",
+                            "conversioncounts",
+                            "conversionvolume",
+                            "leads",
+                            "leadcount",
+                            "orders",
+                            "ordercount",
+                            "signups",
+                            "signupcount",
+                            "purchases",
+                            "purchasecount",
+                            "convertedusers",
+                            "totalconversions"
+                    )
+            ) {
+                return ColumnType.CONVERSIONS;
+            }
+
+            if (
+                    header.contains("conversion")
+                            && !header.contains("rate")
+                            && !header.contains("ratio")
+                            && !header.contains("percent")
+            ) {
+                return ColumnType.CONVERSIONS;
+            }
+
+            if (header.contains("spend")) {
+                return ColumnType.SPEND;
+            }
+
+            if (header.contains("campaign")) {
+                return ColumnType.CAMPAIGN;
+            }
+
+            if (header.contains("impression")) {
+                return ColumnType.IMPRESSIONS;
+            }
+
+            if (header.contains("click")) {
+                return ColumnType.CLICKS;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean matches(
+            String header,
+            String... aliases
+    ) {
+
+        for (String alias : aliases) {
+
+            if (header.equals(alias)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void validateRequiredColumns(
+            Map<ColumnType, Integer> mapping,
+            SourceType sourceType
+    ) {
+
+        requireColumn(
+                mapping,
+                ColumnType.DATE
+        );
+
+        if (sourceType == SourceType.SALES) {
+
+            requireColumn(
+                    mapping,
+                    ColumnType.QUANTITY
+            );
+
+            requireColumn(
+                    mapping,
+                    ColumnType.REVENUE
+            );
+
+        } else if (
+                sourceType == SourceType.INVENTORY
+        ) {
+
+            requireColumn(
+                    mapping,
+                    ColumnType.STOCK_AVAILABLE
+            );
 
         } else {
 
-            return "Low";
+            requireColumn(
+                    mapping,
+                    ColumnType.SPEND
+            );
+
+            requireColumn(
+                    mapping,
+                    ColumnType.CONVERSIONS
+            );
+        }
+    }
+
+    private void requireColumn(
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        if (!mapping.containsKey(type)) {
+
+            throw new IllegalArgumentException(
+                    "Required column not detected: "
+                            + type
+            );
         }
     }
 
     // =========================================================
-    // SAFE STRING
+    // CSV HELPERS
     // =========================================================
 
-    private String safeString(
+    private String[] splitCsvLine(
+            String line
+    ) {
+
+        if (line == null) {
+            return new String[0];
+        }
+
+        List<String> values =
+                new ArrayList<>();
+
+        StringBuilder current =
+                new StringBuilder();
+
+        boolean insideQuotes = false;
+
+        for (
+                int i = 0;
+                i < line.length();
+                i++
+        ) {
+
+            char c =
+                    line.charAt(i);
+
+            if (c == '"') {
+
+                if (
+                        insideQuotes
+                                && i + 1 < line.length()
+                                && line.charAt(i + 1) == '"'
+                ) {
+
+                    current.append('"');
+                    i++;
+
+                } else {
+
+                    insideQuotes =
+                            !insideQuotes;
+                }
+
+            } else if (
+                    c == ','
+                            && !insideQuotes
+            ) {
+
+                values.add(
+                        current.toString()
+                );
+
+                current.setLength(0);
+
+            } else {
+
+                current.append(c);
+            }
+        }
+
+        values.add(
+                current.toString()
+        );
+
+        return values.toArray(
+                new String[0]
+        );
+    }
+
+    private String normalizeHeader(
+            String header
+    ) {
+
+        if (header == null) {
+            return "";
+        }
+
+        return header
+                .replace("\uFEFF", "")
+                .replace("\u00A0", " ")
+                .trim()
+                .toLowerCase(
+                        Locale.ROOT
+                )
+                .replaceAll(
+                        "[^a-z0-9]",
+                        ""
+                );
+    }
+
+    private String getValue(
+            String[] columns,
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        Integer index =
+                mapping.get(type);
+
+        if (
+                index == null
+                        || index < 0
+                        || index >= columns.length
+        ) {
+            return "";
+        }
+
+        return cleanText(
+                columns[index]
+        );
+    }
+
+    private double getDoubleValue(
+            String[] columns,
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        String value =
+                getValue(
+                        columns,
+                        mapping,
+                        type
+                );
+
+        if (isMissingValue(value)) {
+            return 0.0;
+        }
+
+        return parseDouble(value);
+    }
+
+    private double getRequiredDoubleValue(
+            String[] columns,
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        String value =
+                getValue(
+                        columns,
+                        mapping,
+                        type
+                );
+
+        if (isMissingValue(value)) {
+
+            throw new IllegalArgumentException(
+                    "Missing required numeric value: "
+                            + type
+            );
+        }
+
+        return parseDouble(value);
+    }
+
+    // =========================================================
+    // EXCEL HELPERS
+    // =========================================================
+
+    private String[] excelRowToStrings(
+            Row row
+    ) {
+
+        int lastCell =
+                Math.max(
+                        row.getLastCellNum(),
+                        0
+                );
+
+        String[] values =
+                new String[lastCell];
+
+        DataFormatter formatter =
+                new DataFormatter();
+
+        for (
+                int i = 0;
+                i < lastCell;
+                i++
+        ) {
+
+            Cell cell =
+                    row.getCell(
+                            i,
+                            Row.MissingCellPolicy
+                                    .RETURN_BLANK_AS_NULL
+                    );
+
+            values[i] =
+                    cell == null
+                            ? ""
+                            : cleanText(
+                            formatter.formatCellValue(
+                                    cell
+                            )
+                    );
+        }
+
+        return values;
+    }
+
+    private boolean isEmptyExcelRow(
+            Row row
+    ) {
+
+        if (row == null) {
+            return true;
+        }
+
+        DataFormatter formatter =
+                new DataFormatter();
+
+        short lastCell =
+                row.getLastCellNum();
+
+        if (lastCell <= 0) {
+            return true;
+        }
+
+        for (
+                int i = 0;
+                i < lastCell;
+                i++
+        ) {
+
+            Cell cell =
+                    row.getCell(
+                            i,
+                            Row.MissingCellPolicy
+                                    .RETURN_BLANK_AS_NULL
+                    );
+
+            if (
+                    cell != null
+                            && !formatter
+                            .formatCellValue(cell)
+                            .trim()
+                            .isEmpty()
+            ) {
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private String getExcelCell(
+            Row row,
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        Integer index =
+                mapping.get(type);
+
+        if (index == null) {
+            return "";
+        }
+
+        Cell cell =
+                row.getCell(
+                        index,
+                        Row.MissingCellPolicy
+                                .RETURN_BLANK_AS_NULL
+                );
+
+        if (cell == null) {
+            return "";
+        }
+
+        if (
+                cell.getCellType()
+                        == CellType.NUMERIC
+        ) {
+
+            if (
+                    DateUtil.isCellDateFormatted(
+                            cell
+                    )
+            ) {
+
+                return cell
+                        .getLocalDateTimeCellValue()
+                        .toLocalDate()
+                        .toString();
+            }
+
+            return Double.toString(
+                    cell.getNumericCellValue()
+            );
+        }
+
+        if (
+                cell.getCellType()
+                        == CellType.FORMULA
+        ) {
+
+            if (
+                    cell.getCachedFormulaResultType()
+                            == CellType.NUMERIC
+            ) {
+
+                return Double.toString(
+                        cell.getNumericCellValue()
+                );
+            }
+        }
+
+        DataFormatter formatter =
+                new DataFormatter();
+
+        return cleanText(
+                formatter.formatCellValue(
+                        cell
+                )
+        );
+    }
+
+    private String getExcelValue(
+            Row row,
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        return getExcelCell(
+                row,
+                mapping,
+                type
+        );
+    }
+
+    private double getExcelDouble(
+            Row row,
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        String value =
+                getExcelCell(
+                        row,
+                        mapping,
+                        type
+                );
+
+        if (isMissingValue(value)) {
+            return 0.0;
+        }
+
+        return parseDouble(value);
+    }
+
+    private double getRequiredExcelDouble(
+            Row row,
+            Map<ColumnType, Integer> mapping,
+            ColumnType type
+    ) {
+
+        String value =
+                getExcelCell(
+                        row,
+                        mapping,
+                        type
+                );
+
+        if (isMissingValue(value)) {
+
+            throw new IllegalArgumentException(
+                    "Missing required Excel numeric value: "
+                            + type
+            );
+        }
+
+        return parseDouble(value);
+    }
+
+    // =========================================================
+    // DATE PARSING
+    // =========================================================
+
+    private LocalDate parseDate(
+            String value
+    ) {
+
+        if (isMissingValue(value)) {
+
+            throw new IllegalArgumentException(
+                    "Date is missing."
+            );
+        }
+
+        String cleaned =
+                cleanText(value);
+
+        List<DateTimeFormatter> formats =
+                List.of(
+                        DateTimeFormatter.ISO_LOCAL_DATE,
+
+                        DateTimeFormatter.ofPattern(
+                                "dd-MM-yyyy"
+                        ),
+
+                        DateTimeFormatter.ofPattern(
+                                "dd/MM/yyyy"
+                        ),
+
+                        DateTimeFormatter.ofPattern(
+                                "MM/dd/yyyy"
+                        ),
+
+                        DateTimeFormatter.ofPattern(
+                                "MM-dd-yyyy"
+                        ),
+
+                        DateTimeFormatter.ofPattern(
+                                "yyyy/MM/dd"
+                        ),
+
+                        DateTimeFormatter.ofPattern(
+                                "dd MMM yyyy",
+                                Locale.ENGLISH
+                        ),
+
+                        DateTimeFormatter.ofPattern(
+                                "MMM dd yyyy",
+                                Locale.ENGLISH
+                        )
+                );
+
+        for (
+                DateTimeFormatter formatter
+                        : formats
+        ) {
+
+            try {
+
+                return LocalDate.parse(
+                        cleaned,
+                        formatter
+                );
+
+            } catch (
+                    DateTimeParseException ignored
+            ) {
+            }
+        }
+
+        /*
+         * Support common Excel/ISO datetime strings.
+         */
+        if (cleaned.contains("T")) {
+
+            try {
+
+                return LocalDate.parse(
+                        cleaned.substring(
+                                0,
+                                cleaned.indexOf("T")
+                        )
+                );
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (cleaned.contains(" ")) {
+
+            try {
+
+                return LocalDate.parse(
+                        cleaned.substring(
+                                0,
+                                cleaned.indexOf(" ")
+                        )
+                );
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "Unsupported date format: "
+                        + value
+        );
+    }
+
+    private LocalDate parseExcelDate(
+            String value
+    ) {
+
+        return parseDate(value);
+    }
+
+    // =========================================================
+    // NUMBER PARSING
+    // =========================================================
+
+    private double parseDouble(
+            String value
+    ) {
+
+        if (isMissingValue(value)) {
+
+            throw new IllegalArgumentException(
+                    "Numeric value is missing."
+            );
+        }
+
+        String cleaned =
+                cleanText(value)
+                        .replace(",", "")
+                        .replace("₹", "")
+                        .replace("$", "")
+                        .replace("€", "")
+                        .replace("£", "")
+                        .replace("¥", "")
+                        .replace(" ", "");
+
+        boolean negative =
+                cleaned.startsWith("(")
+                        && cleaned.endsWith(")");
+
+        if (negative) {
+
+            cleaned =
+                    cleaned.substring(
+                            1,
+                            cleaned.length() - 1
+                    );
+        }
+
+        if (cleaned.endsWith("%")) {
+
+            cleaned =
+                    cleaned.substring(
+                            0,
+                            cleaned.length() - 1
+                    );
+
+            double result =
+                    Double.parseDouble(
+                            cleaned
+                    ) / 100.0;
+
+            return negative
+                    ? -result
+                    : result;
+        }
+
+        double result =
+                Double.parseDouble(
+                        cleaned
+                );
+
+        if (!Double.isFinite(result)) {
+
+            throw new IllegalArgumentException(
+                    "Invalid numeric value: "
+                            + value
+            );
+        }
+
+        return negative
+                ? -result
+                : result;
+    }
+
+    private boolean isMissingValue(
+            String value
+    ) {
+
+        if (
+                value == null
+                        || value.isBlank()
+        ) {
+            return true;
+        }
+
+        String normalized =
+                value.trim()
+                        .toLowerCase(
+                                Locale.ROOT
+                        );
+
+        return normalized.equals("n/a")
+                || normalized.equals("na")
+                || normalized.equals("null")
+                || normalized.equals("none")
+                || normalized.equals("-")
+                || normalized.equals("nan");
+    }
+
+    // =========================================================
+    // AGGREGATION
+    // =========================================================
+
+    private double sumSalesRevenue(
+            List<SalesRecord> records
+    ) {
+
+        return records.stream()
+                .mapToDouble(
+                        SalesRecord::getRevenue
+                )
+                .filter(Double::isFinite)
+                .sum();
+    }
+
+    private double sumSalesQuantity(
+            List<SalesRecord> records
+    ) {
+
+        return records.stream()
+                .mapToDouble(
+                        SalesRecord::getQuantity
+                )
+                .filter(Double::isFinite)
+                .sum();
+    }
+
+    private double sumInventoryStock(
+            List<InventoryRecord> records
+    ) {
+
+        return records.stream()
+                .mapToDouble(
+                        InventoryRecord::getStockAvailable
+                )
+                .filter(Double::isFinite)
+                .sum();
+    }
+
+    private double sumStockoutHours(
+            List<InventoryRecord> records
+    ) {
+
+        return records.stream()
+                .mapToDouble(
+                        InventoryRecord::getStockoutHours
+                )
+                .filter(Double::isFinite)
+                .sum();
+    }
+
+    private double sumMarketingSpend(
+            List<MarketingRecord> records
+    ) {
+
+        return records.stream()
+                .mapToDouble(
+                        MarketingRecord::getSpend
+                )
+                .filter(Double::isFinite)
+                .sum();
+    }
+
+    private double sumMarketingConversions(
+            List<MarketingRecord> records
+    ) {
+
+        /*
+         * CRITICAL FIX:
+         *
+         * Every validated MarketingRecord contributes its
+         * conversions value exactly once.
+         *
+         * No date filtering or campaign grouping is applied
+         * to TOTAL marketing conversions.
+         */
+        double total =
+                records.stream()
+                        .mapToDouble(
+                                MarketingRecord::getConversions
+                        )
+                        .filter(Double::isFinite)
+                        .sum();
+
+        return safeNumber(total);
+    }
+
+    private double averageSellingPrice(
+            List<SalesRecord> records
+    ) {
+
+        if (records.isEmpty()) {
+            return 0.0;
+        }
+
+        double quantity =
+                sumSalesQuantity(
+                        records
+                );
+
+        if (quantity == 0.0) {
+
+            return records.stream()
+                    .mapToDouble(
+                            SalesRecord::getUnitPrice
+                    )
+                    .filter(Double::isFinite)
+                    .average()
+                    .orElse(0.0);
+        }
+
+        double weightedRevenue =
+                records.stream()
+                        .mapToDouble(
+                                r ->
+                                        safeNumber(
+                                                r.getQuantity()
+                                                        * r.getUnitPrice()
+                                        )
+                        )
+                        .filter(Double::isFinite)
+                        .sum();
+
+        return weightedRevenue / quantity;
+    }
+
+    private double percentageChange(
+            double baseline,
+            double recent
+    ) {
+
+        if (
+                !Double.isFinite(baseline)
+                        || !Double.isFinite(recent)
+        ) {
+            return 0.0;
+        }
+
+        if (baseline == 0.0) {
+
+            if (recent == 0.0) {
+                return 0.0;
+            }
+
+            /*
+             * Percentage change from zero is mathematically
+             * undefined.
+             *
+             * We return a bounded directional signal rather
+             * than an infinite value.
+             */
+            return recent > 0.0
+                    ? 100.0
+                    : -100.0;
+        }
+
+        double change =
+                (
+                        (recent - baseline)
+                                / Math.abs(baseline)
+                ) * 100.0;
+
+        return Double.isFinite(change)
+                ? change
+                : 0.0;
+    }
+
+    // =========================================================
+    // INSUFFICIENT HISTORY
+    // =========================================================
+
+    private List<String> buildInsufficientHistoryEvidence(
+            List<SalesRecord> sales,
+            List<InventoryRecord> inventory,
+            List<MarketingRecord> marketing,
+            Set<LocalDate> commonDates,
+            SparseHistoryAssessment sparse
+    ) {
+
+        List<String> evidence =
+                new ArrayList<>();
+
+        evidence.add(
+                "Common-date aligned observations: "
+                        + commonDates.size()
+        );
+
+        evidence.add(
+                "Sales records: "
+                        + sales.size()
+        );
+
+        evidence.add(
+                "Inventory records: "
+                        + inventory.size()
+        );
+
+        evidence.add(
+                "Marketing records: "
+                        + marketing.size()
+        );
+
+        evidence.add(
+                "Marketing conversions available: "
+                        + round(
+                        sumMarketingConversions(
+                                marketing
+                        )
+                )
+        );
+
+        if (!sparse.reasons.isEmpty()) {
+
+            evidence.add(
+                    "Data sufficiency issues: "
+                            + String.join(
+                            "; ",
+                            sparse.reasons
+                    )
+            );
+        }
+
+        return evidence;
+    }
+
+    private String buildClarificationRequest(
+            SparseHistoryAssessment sparse
+    ) {
+
+        if (sparse.reasons.isEmpty()) {
+
+            return "Please provide more aligned historical data before making a business decision.";
+        }
+
+        return "Clarification/data request: "
+                + String.join(
+                "; ",
+                sparse.reasons
+        )
+                + ". Please provide additional aligned history or confirm the KPI definition before taking automated action.";
+    }
+
+    // =========================================================
+    // ANALYTICAL METHOD
+    // =========================================================
+
+    private String buildAnalyticalMethod() {
+
+        return "Semantic column detection + deterministic source validation + CSV/XLSX parsing + source-aware schema mapping + common-date alignment + observation-based baseline/recent split + sparse-history detection + deterministic KPI aggregation + cross-source movement analysis + movement-based driver prioritisation + traceable evidence + lineage-style source coverage + rule-based confidence scoring + confidence gating + abstention when evidence is insufficient. Quantitative truth is produced by deterministic analytical logic; the LLM is not used as the quantitative truth source.";
+    }
+
+    // =========================================================
+    // SAFE HELPERS
+    // =========================================================
+
+    private String cleanText(
+            String value
+    ) {
+
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replace("\uFEFF", "")
+                .replace("\u00A0", " ")
+                .trim()
+                .replaceAll(
+                        "^\"|\"$",
+                        ""
+                )
+                .trim();
+    }
+
+    private String safeText(
             String value,
             String fallback
     ) {
@@ -2899,4 +4582,46 @@ public class MultiSourceAnalysisService {
 
         return value.trim();
     }
+
+    private double safeNumber(
+            double value
+    ) {
+
+        return Double.isFinite(value)
+                ? value
+                : 0.0;
+    }
+
+    private double round(
+            double value
+    ) {
+
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
+
+        return Math.round(
+                value * 100.0
+        ) / 100.0;
+    }
+
+    private double clamp(
+            double value,
+            double min,
+            double max
+    ) {
+
+        if (!Double.isFinite(value)) {
+            return min;
+        }
+
+        return Math.max(
+                min,
+                Math.min(
+                        max,
+                        value
+                )
+        );
+    }
 }
+
